@@ -8,8 +8,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: 'TripMoney — Track Every Dollar',
-        short_name: 'TripMoney',
+        name: 'MyTripMoney — Track Every Dollar',
+        short_name: 'MyTripMoney',
         description: 'Multi-currency travel expense tracker.',
         theme_color: '#0A0F1E',
         background_color: '#0A0F1E',
