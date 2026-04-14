@@ -861,19 +861,93 @@ function ReportsScreen({ expenses, trip, setScreen }) {
 // ─── SETTINGS ─────────────────────────────────────────────────────
 function SettingsScreen({ trip, onUpdateTrip, onClearData, onBack }) {
   const [form, setForm] = useState({ ...trip, budget: String(trip.budget) });
+  const [legs, setLegs] = useState(trip.legs ? trip.legs.map(l => ({ ...l, budget: String(l.budget) })) : []);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [saved, setSaved] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const updateLeg = (id, k, v) => {
+    setLegs(prev => {
+      const updated = prev.map(x => x.id === id ? { ...x, [k]: v } : x);
+      // Cascade from/departureDate to subsequent legs
+      for (let i = 1; i < updated.length; i++) {
+        updated[i] = { ...updated[i], from: updated[i - 1].to, departureDate: updated[i - 1].returnDate };
+      }
+      return [...updated];
+    });
+  };
+
+  const handleSave = () => {
+    const processedLegs = legs.map(l => ({ ...l, budget: parseFloat(l.budget) || 0 }));
+    const totalBudget = trip.isMultiLeg ? processedLegs.reduce((s, l) => s + l.budget, 0) : parseFloat(form.budget) || 2500;
+    const allDates = processedLegs.flatMap(l => [l.departureDate, l.returnDate]).filter(Boolean).sort();
+    const firstDate = allDates[0] || form.departureDate;
+    const lastDate = allDates[allDates.length - 1] || form.returnDate;
+    onUpdateTrip({
+      ...form,
+      budget: totalBudget,
+      legs: processedLegs,
+      departureDate: trip.isMultiLeg ? firstDate : form.departureDate,
+      returnDate: trip.isMultiLeg ? lastDate : form.returnDate,
+      destination: trip.isMultiLeg ? processedLegs.map(l => l.to).join(", ") : form.destination,
+    });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
   return (
     <div style={{ padding: "20px 16px 100px" }}>
       <BackButton onClick={onBack} />
       <div style={{ color: T.text, fontSize: 22, fontWeight: 900, marginBottom: 20 }}>Settings</div>
+
+      {saved && <div style={{ background: T.green + "22", border: `1px solid ${T.green}44`, borderRadius: 12, padding: 12, marginBottom: 16, color: T.green, fontWeight: 700, textAlign: "center" }}>✅ Changes saved!</div>}
+
       <Card style={{ marginBottom: 16 }}>
         <div style={{ color: T.textMid, fontSize: 12, fontWeight: 700, textTransform: "uppercase", marginBottom: 14 }}>Trip Info</div>
         <InputRow label="Name"><input value={form.name} onChange={e => set("name", e.target.value)} style={inputStyle} /></InputRow>
         <CurrencyPicker value={form.currency} onChange={v => set("currency", v)} label="Base Currency" />
-        <InputRow label="Budget"><div style={{ position: "relative" }}><span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: T.textMid, fontWeight: 700 }}>{curByCode(form.currency).symbol}</span><input value={form.budget} onChange={e => set("budget", e.target.value)} type="number" style={{ ...inputStyle, paddingLeft: 36 }} /></div></InputRow>
-        <button onClick={() => onUpdateTrip({ ...form, budget: parseFloat(form.budget) || 2500 })} style={{ width: "100%", background: T.accent, color: T.bg, border: "none", borderRadius: 12, padding: 14, fontSize: 15, fontWeight: 800, cursor: "pointer" }}>Save</button>
+        {!trip.isMultiLeg && (
+          <>
+            <InputRow label="Destination"><input value={form.destination || ""} onChange={e => set("destination", e.target.value)} style={inputStyle} /></InputRow>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <InputRow label="Departure"><input type="date" value={form.departureDate || ""} onChange={e => set("departureDate", e.target.value)} style={inputStyle} /></InputRow>
+              <InputRow label="Return"><input type="date" value={form.returnDate || ""} onChange={e => set("returnDate", e.target.value)} style={inputStyle} /></InputRow>
+            </div>
+            <InputRow label="Budget"><div style={{ position: "relative" }}><span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: T.textMid, fontWeight: 700 }}>{curByCode(form.currency).symbol}</span><input value={form.budget} onChange={e => set("budget", e.target.value)} type="number" style={{ ...inputStyle, paddingLeft: 36 }} /></div></InputRow>
+          </>
+        )}
       </Card>
+
+      {trip.isMultiLeg && legs.length > 0 && (
+        <Card style={{ marginBottom: 16 }}>
+          <div style={{ color: T.textMid, fontSize: 12, fontWeight: 700, textTransform: "uppercase", marginBottom: 14 }}>Edit Legs</div>
+          {legs.map((leg, i) => {
+            const isFirst = i === 0;
+            const locked = !isFirst;
+            return (
+              <div key={leg.id} style={{ marginBottom: 16, paddingBottom: 16, borderBottom: i < legs.length - 1 ? `1px solid ${T.border}` : "none" }}>
+                <div style={{ color: LEG_COLORS[i % LEG_COLORS.length], fontSize: 13, fontWeight: 800, marginBottom: 10 }}>Leg {i + 1}{locked && <span style={{ color: T.textDim, fontSize: 11, fontWeight: 400, marginLeft: 6 }}>continues from Leg {i}</span>}</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+                  <div><div style={{ color: T.textDim, fontSize: 10, fontWeight: 600, marginBottom: 4 }}>FROM {locked && "🔒"}</div><input value={leg.from} readOnly={locked} onChange={e => !locked && updateLeg(leg.id, "from", e.target.value)} style={{ ...inputStyle, padding: "10px 12px", fontSize: 13, opacity: locked ? 0.6 : 1, cursor: locked ? "not-allowed" : "text" }} /></div>
+                  <div><div style={{ color: T.textDim, fontSize: 10, fontWeight: 600, marginBottom: 4 }}>TO</div><input value={leg.to} onChange={e => updateLeg(leg.id, "to", e.target.value)} style={{ ...inputStyle, padding: "10px 12px", fontSize: 13 }} /></div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+                  <div><div style={{ color: T.textDim, fontSize: 10, fontWeight: 600, marginBottom: 4 }}>DEPART {locked && "🔒"}</div><input type="date" value={leg.departureDate} readOnly={locked} onChange={e => !locked && updateLeg(leg.id, "departureDate", e.target.value)} style={{ ...inputStyle, padding: "10px 12px", fontSize: 13, opacity: locked ? 0.6 : 1, cursor: locked ? "not-allowed" : "text" }} /></div>
+                  <div><div style={{ color: T.textDim, fontSize: 10, fontWeight: 600, marginBottom: 4 }}>RETURN</div><input type="date" value={leg.returnDate} onChange={e => updateLeg(leg.id, "returnDate", e.target.value)} style={{ ...inputStyle, padding: "10px 12px", fontSize: 13 }} /></div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <div><div style={{ color: T.textDim, fontSize: 10, fontWeight: 600, marginBottom: 4 }}>BUDGET</div><div style={{ position: "relative" }}><span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: T.textDim, fontSize: 12 }}>{curByCode(leg.currency).symbol}</span><input value={leg.budget} onChange={e => updateLeg(leg.id, "budget", e.target.value)} type="number" style={{ ...inputStyle, padding: "10px 12px 10px 28px", fontSize: 13 }} /></div></div>
+                  <div><div style={{ color: T.textDim, fontSize: 10, fontWeight: 600, marginBottom: 4 }}>CURRENCY</div><select value={leg.currency} onChange={e => updateLeg(leg.id, "currency", e.target.value)} style={{ ...inputStyle, padding: "10px 12px", fontSize: 13 }}>{CURRENCIES.slice(0, 30).map(c => <option key={c.code} value={c.code}>{c.flag} {c.code}</option>)}</select></div>
+                </div>
+              </div>
+            );
+          })}
+          <div style={{ color: T.textMid, fontSize: 13, marginBottom: 8 }}>Total budget: <span style={{ color: T.accent, fontWeight: 900 }}>{fmtCur(legs.reduce((s, l) => s + (parseFloat(l.budget) || 0), 0), form.currency)}</span></div>
+        </Card>
+      )}
+
+      <button onClick={handleSave} style={{ width: "100%", background: T.accent, color: T.bg, border: "none", borderRadius: 14, padding: 15, fontSize: 16, fontWeight: 900, cursor: "pointer", marginBottom: 16 }}>Save All Changes</button>
+
       <Card style={{ borderColor: T.red + "33" }}>
         <div style={{ color: T.red, fontSize: 12, fontWeight: 700, textTransform: "uppercase", marginBottom: 10 }}>Danger Zone</div>
         {!confirmClear ? <button onClick={() => setConfirmClear(true)} style={{ width: "100%", background: T.red + "15", color: T.red, border: `1px solid ${T.red}33`, borderRadius: 12, padding: 14, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>🗑️ Clear All Data</button> : (
