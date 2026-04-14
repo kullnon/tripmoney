@@ -354,8 +354,26 @@ function CreateTripScreen({ onSave }) {
     const lastLeg = legs[legs.length - 1];
     setLegs(l => [...l, { id: uid(), from: lastLeg.to, to: "", departureDate: lastLeg.returnDate, returnDate: "", budget: "", currency: lastLeg.currency }]);
   };
-  const removeLeg = (id) => setLegs(l => l.filter(x => x.id !== id));
-  const updateLeg = (id, k, v) => setLegs(l => l.map(x => x.id === id ? { ...x, [k]: v } : x));
+  const removeLeg = (id) => {
+    setLegs(prev => {
+      const next = prev.filter(x => x.id !== id);
+      // Re-cascade from/departureDate after removal
+      for (let i = 1; i < next.length; i++) {
+        next[i] = { ...next[i], from: next[i - 1].to, departureDate: next[i - 1].returnDate };
+      }
+      return [...next];
+    });
+  };
+  const updateLeg = (id, k, v) => {
+    setLegs(prev => {
+      const updated = prev.map(x => x.id === id ? { ...x, [k]: v } : x);
+      // Cascade: when "to" or "returnDate" changes, update next leg's "from" and "departureDate"
+      for (let i = 1; i < updated.length; i++) {
+        updated[i] = { ...updated[i], from: updated[i - 1].to, departureDate: updated[i - 1].returnDate };
+      }
+      return [...updated];
+    });
+  };
 
   const totalDays = form.departureDate && form.returnDate ? daysBetween(form.departureDate, form.returnDate) : 0;
 
@@ -422,18 +440,22 @@ function CreateTripScreen({ onSave }) {
 
       <div style={{ color: T.textMid, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 12, marginTop: 8 }}>Journey Legs</div>
 
-      {legs.map((leg, i) => (
+      {legs.map((leg, i) => {
+        const isFirst = i === 0;
+        const lockedFrom = !isFirst;
+        const lockedDepart = !isFirst;
+        return (
         <Card key={leg.id} style={{ marginBottom: 12, borderColor: LEG_COLORS[i % LEG_COLORS.length] + "44", background: LEG_COLORS[i % LEG_COLORS.length] + "08" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-            <div style={{ color: LEG_COLORS[i % LEG_COLORS.length], fontSize: 14, fontWeight: 800 }}>Leg {i + 1}</div>
-            {legs.length > 1 && <button onClick={() => removeLeg(leg.id)} style={{ color: T.red, background: "none", border: "none", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>Remove</button>}
+            <div style={{ color: LEG_COLORS[i % LEG_COLORS.length], fontSize: 14, fontWeight: 800 }}>Leg {i + 1}{!isFirst && <span style={{ color: T.textDim, fontSize: 11, fontWeight: 400, marginLeft: 6 }}>continues from Leg {i}</span>}</div>
+            {legs.length > 1 && i === legs.length - 1 && <button onClick={() => removeLeg(leg.id)} style={{ color: T.red, background: "none", border: "none", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>Remove</button>}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
-            <div><div style={{ color: T.textDim, fontSize: 10, fontWeight: 600, marginBottom: 4 }}>FROM</div><input value={leg.from} onChange={e => updateLeg(leg.id, "from", e.target.value)} placeholder="e.g. USA" style={{ ...inputStyle, padding: "10px 12px", fontSize: 13 }} /></div>
+            <div><div style={{ color: T.textDim, fontSize: 10, fontWeight: 600, marginBottom: 4 }}>FROM {lockedFrom && "🔒"}</div><input value={leg.from} onChange={e => !lockedFrom && updateLeg(leg.id, "from", e.target.value)} placeholder="e.g. USA" readOnly={lockedFrom} style={{ ...inputStyle, padding: "10px 12px", fontSize: 13, opacity: lockedFrom ? 0.6 : 1, cursor: lockedFrom ? "not-allowed" : "text" }} /></div>
             <div><div style={{ color: T.textDim, fontSize: 10, fontWeight: 600, marginBottom: 4 }}>TO</div><input value={leg.to} onChange={e => updateLeg(leg.id, "to", e.target.value)} placeholder="e.g. Cuba" style={{ ...inputStyle, padding: "10px 12px", fontSize: 13 }} /></div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
-            <div><div style={{ color: T.textDim, fontSize: 10, fontWeight: 600, marginBottom: 4 }}>DEPART</div><input type="date" value={leg.departureDate} onChange={e => updateLeg(leg.id, "departureDate", e.target.value)} style={{ ...inputStyle, padding: "10px 12px", fontSize: 13 }} /></div>
+            <div><div style={{ color: T.textDim, fontSize: 10, fontWeight: 600, marginBottom: 4 }}>DEPART {lockedDepart && "🔒"}</div><input type="date" value={leg.departureDate} onChange={e => !lockedDepart && updateLeg(leg.id, "departureDate", e.target.value)} readOnly={lockedDepart} style={{ ...inputStyle, padding: "10px 12px", fontSize: 13, opacity: lockedDepart ? 0.6 : 1, cursor: lockedDepart ? "not-allowed" : "text" }} /></div>
             <div><div style={{ color: T.textDim, fontSize: 10, fontWeight: 600, marginBottom: 4 }}>RETURN</div><input type="date" value={leg.returnDate} onChange={e => updateLeg(leg.id, "returnDate", e.target.value)} style={{ ...inputStyle, padding: "10px 12px", fontSize: 13 }} /></div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -441,7 +463,8 @@ function CreateTripScreen({ onSave }) {
             <div><div style={{ color: T.textDim, fontSize: 10, fontWeight: 600, marginBottom: 4 }}>CURRENCY</div><select value={leg.currency} onChange={e => updateLeg(leg.id, "currency", e.target.value)} style={{ ...inputStyle, padding: "10px 12px", fontSize: 13 }}>{CURRENCIES.slice(0, 30).map(c => <option key={c.code} value={c.code}>{c.flag} {c.code}</option>)}</select></div>
           </div>
         </Card>
-      ))}
+        );
+      })}
 
       <button onClick={addLeg} style={{ width: "100%", background: T.card, color: T.accent, border: `1px dashed ${T.accent}44`, borderRadius: 14, padding: 14, fontSize: 14, fontWeight: 700, cursor: "pointer", marginBottom: 16 }}>+ Add Another Leg</button>
 
