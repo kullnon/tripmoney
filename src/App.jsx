@@ -888,7 +888,7 @@ function SettingsScreen({ trip, onUpdateTrip, onClearData, onBack }) {
 const NAV = [{ id: "dashboard", icon: "🏠", label: "Home" }, { id: "history", icon: "📋", label: "History" }, { id: "budget", icon: "💰", label: "Budget" }, { id: "reports", icon: "📊", label: "Reports" }];
 
 export default function TripMoneyApp() {
-  const [screen, setScreen] = useState("welcome");
+  const [screen, setScreenRaw] = useState("welcome");
   const [trip, setTrip] = useState(DEFAULT_TRIP);
   const [expenses, setExpenses] = useState(SEED_EXPENSES);
   const [selectedExpense, setSelectedExpense] = useState(null);
@@ -896,8 +896,51 @@ export default function TripMoneyApp() {
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
-  useEffect(() => { (async () => { const t = await loadData("tm-trip", null); const e = await loadData("tm-expenses", null); const s = await loadData("tm-screen", null); if (t) setTrip(t); if (e) setExpenses(e); if (s && s !== "welcome") setScreen(s); setLoaded(true); })(); }, []);
-  useEffect(() => { if (!loaded) return; saveData("tm-trip", trip); saveData("tm-expenses", expenses); if (["dashboard", "history", "budget", "reports"].includes(screen)) saveData("tm-screen", screen); }, [trip, expenses, screen, loaded]);
+  // Screen navigation with browser history (fixes phone back button)
+  const screenHistory = useRef(["welcome"]);
+  const setScreen = useCallback((s) => {
+    screenHistory.current.push(s);
+    window.history.pushState({ screen: s }, "");
+    setScreenRaw(s);
+  }, []);
+
+  // Handle phone back button
+  useEffect(() => {
+    const handlePop = (e) => {
+      if (showQuickAdd) { setShowQuickAdd(false); window.history.pushState({}, ""); return; }
+      screenHistory.current.pop();
+      const prev = screenHistory.current[screenHistory.current.length - 1];
+      if (prev && prev !== "welcome") { setScreenRaw(prev); }
+      else if (["dashboard", "history", "budget", "reports"].includes(screenHistory.current[screenHistory.current.length - 1])) { setScreenRaw(screenHistory.current[screenHistory.current.length - 1]); }
+      else { setScreenRaw("dashboard"); screenHistory.current.push("dashboard"); window.history.pushState({}, ""); }
+    };
+    window.addEventListener("popstate", handlePop);
+    return () => window.removeEventListener("popstate", handlePop);
+  }, [showQuickAdd]);
+
+  // Load persisted data
+  useEffect(() => {
+    const t = loadDataSync("tm-trip", null);
+    const e = loadDataSync("tm-expenses", null);
+    const s = loadDataSync("tm-screen", null);
+    if (t) setTrip(t);
+    if (e) setExpenses(e);
+    if (s && s !== "welcome" && ["dashboard", "history", "budget", "reports"].includes(s)) {
+      setScreenRaw(s);
+      screenHistory.current = [s];
+    }
+    setLoaded(true);
+    // Push initial history state
+    window.history.replaceState({}, "");
+  }, []);
+
+  // Save on change
+  useEffect(() => {
+    if (!loaded) return;
+    saveDataSync("tm-trip", trip);
+    saveDataSync("tm-expenses", expenses);
+    if (["dashboard", "history", "budget", "reports"].includes(screen)) saveDataSync("tm-screen", screen);
+  }, [trip, expenses, screen, loaded]);
 
   const addExpense = (e) => setExpenses(p => [...p, e]);
   const updateExpense = (e) => setExpenses(p => p.map(x => x.id === e.id ? e : x));
