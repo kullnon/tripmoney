@@ -328,17 +328,33 @@ function EmailReportScreen({ trip, expenses, onBack }) {
 }
 
 // ─── WELCOME ──────────────────────────────────────────────────────
-function WelcomeScreen({ onStart, onCreateTrip }) {
+function WelcomeScreen({ onStart, onCreateTrip, onInstall, isInstalled, canInstall, isIOS, isMobile }) {
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 24px", textAlign: "center" }}>
-      
+      <img src="/pwa-192x192.png" alt="" style={{ width: 72, height: 72, marginBottom: 16 }} onError={e => e.target.style.display = "none"} />
       <div style={{ fontSize: 32, fontWeight: 900, color: T.text, letterSpacing: -1 }}>My<span style={{ color: T.accent }}>Trip</span>Money</div>
-      <div style={{ color: T.textMid, fontSize: 15, marginTop: 10, marginBottom: 40, lineHeight: 1.5, maxWidth: 260 }}>Track every dollar — from planning to landing.</div>
+      <div style={{ color: T.textMid, fontSize: 15, marginTop: 10, marginBottom: 32, lineHeight: 1.5, maxWidth: 260 }}>Track every dollar — from planning to landing.</div>
+
       <div style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%", maxWidth: 300 }}>
         <button onClick={onCreateTrip} style={{ background: T.accent, color: T.bg, border: "none", borderRadius: 14, padding: 16, fontSize: 16, fontWeight: 800, cursor: "pointer" }}>Start New Trip →</button>
         <button onClick={onStart} style={{ background: "transparent", color: T.textMid, border: `1px solid ${T.border}`, borderRadius: 14, padding: 14, fontSize: 14, cursor: "pointer" }}>Load Demo Trip</button>
       </div>
-      <div style={{ marginTop: 40, display: "flex", gap: 20, color: T.textDim, fontSize: 12, flexWrap: "wrap", justifyContent: "center" }}><span>📴 Offline</span><span>📊 Reports</span><span>🔒 Private</span><span>🌍 Multi-Currency</span><span>🗺️ Multi-Leg</span></div>
+
+      {!isInstalled && isMobile && onInstall && (
+        <div style={{
+          marginTop: 32, padding: 16, borderRadius: 16,
+          background: `linear-gradient(135deg, ${T.accent}15, ${T.purple}15)`,
+          border: `1px solid ${T.accent}33`, maxWidth: 320, width: "100%",
+        }}>
+          <div style={{ color: T.accent, fontSize: 12, fontWeight: 800, marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>📲 Install the App</div>
+          <div style={{ color: T.text, fontSize: 14, marginBottom: 12, lineHeight: 1.5 }}>Add MyTripMoney to your home screen for instant access.</div>
+          <button onClick={onInstall} style={{ width: "100%", background: T.accent, color: T.bg, border: "none", borderRadius: 10, padding: 12, fontSize: 14, fontWeight: 800, cursor: "pointer" }}>
+            {canInstall ? "Install Now" : isIOS ? "How to Install on iPhone" : "How to Install"}
+          </button>
+        </div>
+      )}
+
+      <div style={{ marginTop: 32, display: "flex", gap: 20, color: T.textDim, fontSize: 12, flexWrap: "wrap", justifyContent: "center" }}><span>📴 Offline</span><span>📊 Reports</span><span>🔒 Private</span><span>🌍 Multi-Currency</span><span>🗺️ Multi-Leg</span></div>
     </div>
   );
 }
@@ -1014,7 +1030,7 @@ function SettingsScreen({ trip, onUpdateTrip, onClearData, onDeleteTrip, onBack,
 // ─── APP ──────────────────────────────────────────────────────────
 const NAV = [{ id: "dashboard", icon: "🏠", label: "Home" }, { id: "history", icon: "📋", label: "History" }, { id: "budget", icon: "💰", label: "Budget" }, { id: "reports", icon: "📊", label: "Reports" }];
 
-export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstall, isInstalled, onPaywall } = {}) {
+export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstall, isInstalled, canInstall, isIOS, isMobile, onPaywall } = {}) {
   const [screen, setScreenRaw] = useState("welcome");
   const [trip, setTrip] = useState(DEFAULT_TRIP);
   const [expenses, setExpenses] = useState(SEED_EXPENSES);
@@ -1089,7 +1105,7 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
         </div>
       )}
       <div>
-        {screen === "welcome" && <WelcomeScreen onStart={() => { setTrip(DEFAULT_TRIP); setExpenses(SEED_EXPENSES); setScreen("dashboard"); }} onCreateTrip={() => setScreen("create-trip")} />}
+        {screen === "welcome" && <WelcomeScreen onStart={() => { setTrip(DEFAULT_TRIP); setExpenses(SEED_EXPENSES); setScreen("dashboard"); }} onCreateTrip={() => setScreen("create-trip")} onInstall={onInstall} isInstalled={isInstalled} canInstall={canInstall} isIOS={isIOS} isMobile={isMobile} />}
         {screen === "create-trip" && <CreateTripScreen onSave={t => { setTrip(t); setExpenses([]); setScreen("dashboard"); }} />}
         {screen === "dashboard" && <DashboardScreen expenses={expenses} trip={trip} setScreen={setScreen} setSelectedExpense={setSelectedExpense} />}
         {screen === "history" && <HistoryScreen expenses={expenses} trip={trip} setScreen={setScreen} setSelectedExpense={setSelectedExpense} />}
