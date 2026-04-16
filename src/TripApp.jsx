@@ -859,7 +859,7 @@ function ReportsScreen({ expenses, trip, setScreen }) {
 }
 
 // ─── SETTINGS ─────────────────────────────────────────────────────
-function SettingsScreen({ trip, onUpdateTrip, onClearData, onBack }) {
+function SettingsScreen({ trip, onUpdateTrip, onClearData, onBack, user, profile, isPro, onSignOut, onInstall, isInstalled }) {
   const [form, setForm] = useState({ ...trip, budget: String(trip.budget) });
   const [legs, setLegs] = useState(trip.legs ? trip.legs.map(l => ({ ...l, budget: String(l.budget) })) : []);
   const [confirmClear, setConfirmClear] = useState(false);
@@ -901,6 +901,26 @@ function SettingsScreen({ trip, onUpdateTrip, onClearData, onBack }) {
       <div style={{ color: T.text, fontSize: 22, fontWeight: 900, marginBottom: 20 }}>Settings</div>
 
       {saved && <div style={{ background: T.green + "22", border: `1px solid ${T.green}44`, borderRadius: 12, padding: 12, marginBottom: 16, color: T.green, fontWeight: 700, textAlign: "center" }}>✅ Changes saved!</div>}
+
+      {user && (
+        <Card style={{ marginBottom: 16 }}>
+          <div style={{ color: T.textMid, fontSize: 12, fontWeight: 700, textTransform: "uppercase", marginBottom: 14 }}>Account</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+            <div style={{ width: 44, height: 44, borderRadius: "50%", background: `linear-gradient(135deg, ${T.accent}, ${T.purple})`, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 900, fontSize: 18, flexShrink: 0 }}>
+              {(profile?.full_name || user.email)[0].toUpperCase()}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ color: T.text, fontSize: 15, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{profile?.full_name || user.email}</div>
+              <div style={{ color: T.textMid, fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.email}</div>
+            </div>
+            <span style={{ background: isPro ? T.accent + "22" : T.textDim + "22", color: isPro ? T.accent : T.textDim, fontSize: 10, fontWeight: 800, padding: "4px 8px", borderRadius: 99, textTransform: "uppercase" }}>{isPro ? "Pro" : "Free"}</span>
+          </div>
+          {!isInstalled && onInstall && (
+            <button onClick={onInstall} style={{ width: "100%", background: `linear-gradient(135deg, ${T.accent}22, ${T.purple}22)`, color: T.accent, border: `1px solid ${T.accent}44`, borderRadius: 12, padding: 14, fontSize: 14, fontWeight: 700, cursor: "pointer", marginBottom: 10 }}>📲 Install on Home Screen</button>
+          )}
+          <button onClick={onSignOut} style={{ width: "100%", background: T.card, color: T.textMid, border: `1px solid ${T.border}`, borderRadius: 12, padding: 12, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>🚪 Sign Out</button>
+        </Card>
+      )}
 
       <Card style={{ marginBottom: 16 }}>
         <div style={{ color: T.textMid, fontSize: 12, fontWeight: 700, textTransform: "uppercase", marginBottom: 14 }}>Trip Info</div>
@@ -961,7 +981,7 @@ function SettingsScreen({ trip, onUpdateTrip, onClearData, onBack }) {
 // ─── APP ──────────────────────────────────────────────────────────
 const NAV = [{ id: "dashboard", icon: "🏠", label: "Home" }, { id: "history", icon: "📋", label: "History" }, { id: "budget", icon: "💰", label: "Budget" }, { id: "reports", icon: "📊", label: "Reports" }];
 
-export default function TripMoneyApp() {
+export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstall, isInstalled, onPaywall } = {}) {
   const [screen, setScreenRaw] = useState("welcome");
   const [trip, setTrip] = useState(DEFAULT_TRIP);
   const [expenses, setExpenses] = useState(SEED_EXPENSES);
@@ -1045,7 +1065,7 @@ export default function TripMoneyApp() {
         {screen === "budget" && <BudgetScreen expenses={expenses} trip={trip} />}
         {screen === "reports" && <ReportsScreen expenses={expenses} trip={trip} setScreen={setScreen} />}
         {screen === "expense-detail" && <ExpenseDetailScreen expense={selectedExpense} trip={trip} setScreen={setScreen} onDelete={deleteExpense} onDuplicate={duplicateExpense} onEdit={handleEdit} />}
-        {screen === "settings" && <SettingsScreen trip={trip} onUpdateTrip={setTrip} onClearData={() => { setExpenses([]); setScreen("welcome"); localStorage.clear(); }} onBack={() => setScreen("dashboard")} />}
+        {screen === "settings" && <SettingsScreen trip={trip} onUpdateTrip={setTrip} onClearData={() => { setExpenses([]); setScreen("welcome"); localStorage.clear(); }} onBack={() => setScreen("dashboard")} user={user} profile={profile} isPro={isPro} onSignOut={onSignOut} onInstall={onInstall} isInstalled={isInstalled} />}
         {screen === "email-report" && <EmailReportScreen trip={trip} expenses={expenses} onBack={() => setScreen("reports")} />}
       </div>
       {showQuickAdd && <QuickAddSheet onSave={addExpense} onFullForm={() => { setShowQuickAdd(false); setScreen("add"); }} onClose={() => setShowQuickAdd(false)} trip={trip} />}
