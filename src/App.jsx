@@ -11,20 +11,38 @@ const T = {
 
 function LoadingScreen() {
   return (
-    <div style={{ minHeight: "100vh", background: T.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-      <img src="/favicon.png" alt="" style={{ width: 64, height: 64, borderRadius: 16, marginBottom: 20 }} onError={e => e.target.style.display = "none"} />
-      <div style={{ fontSize: 24, fontWeight: 900, color: T.text }}>
+    <div style={{
+      minHeight: "100vh", background: T.bg, display: "flex",
+      flexDirection: "column", alignItems: "center", justifyContent: "center",
+      animation: "fadeIn 0.4s ease",
+    }}>
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+      `}</style>
+      <img src="/pwa-192x192.png" alt=""
+        style={{ width: 96, height: 96, marginBottom: 24, animation: "float 2s ease-in-out infinite" }}
+        onError={e => e.target.style.display = "none"} />
+      <div style={{ fontSize: 26, fontWeight: 900, color: T.text, letterSpacing: -0.5 }}>
         <span>My</span><span style={{ color: T.accent }}>Trip</span><span>Money</span>
       </div>
-      <div style={{ color: T.textDim, fontSize: 14, marginTop: 8 }}>Loading...</div>
+      <div style={{ color: T.textDim, fontSize: 13, marginTop: 10, animation: "pulse 1.5s ease-in-out infinite" }}>Loading your trips...</div>
     </div>
   );
 }
 
 export default function App() {
   const { user, profile, loading, isPro, signOut } = useAuth();
-  const [view, setView] = useState("landing"); // landing, auth, app, paywall
+  const [view, setView] = useState("landing");
   const [paywallFeature, setPaywallFeature] = useState("");
+  const [minLoadDone, setMinLoadDone] = useState(false);
+
+  // Minimum loading time so the splash doesn't flash
+  useEffect(() => {
+    const timer = setTimeout(() => setMinLoadDone(true), 1500);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Route based on auth state
   useEffect(() => {
@@ -34,8 +52,8 @@ export default function App() {
     }
   }, [user, loading]);
 
-  // Loading state
-  if (loading) return <LoadingScreen />;
+  // Show loading until BOTH auth loaded AND minimum time passed
+  if (loading || !minLoadDone) return <LoadingScreen />;
 
   // Landing page (not logged in)
   if (view === "landing" && !user) {
@@ -66,6 +84,6 @@ export default function App() {
     />;
   }
 
-  // Fallback to landing
+  // Fallback
   return <LandingPage onGetStarted={() => setView("auth")} onLogin={() => setView("auth")} />;
 }
