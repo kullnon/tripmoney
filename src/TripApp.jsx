@@ -360,7 +360,7 @@ function WelcomeScreen({ onStart, onCreateTrip, onInstall, isInstalled, canInsta
 }
 
 // ─── CREATE TRIP ──────────────────────────────────────────────────
-function CreateTripScreen({ onSave }) {
+function CreateTripScreen({ onSave, onBack }) {
   const [tripType, setTripType] = useState(null); // null, "single", "multi"
   const [form, setForm] = useState({ name: "", destination: "", departureDate: "", returnDate: "", budget: "2500", currency: "USD" });
   const [legs, setLegs] = useState([{ id: 1, from: "", to: "", departureDate: "", returnDate: "", budget: "", currency: "USD" }]);
@@ -395,20 +395,23 @@ function CreateTripScreen({ onSave }) {
 
   if (tripType === null) {
     return (
-      <div style={{ minHeight: "100vh", padding: "40px 20px 60px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ fontSize: 28, fontWeight: 900, color: T.text, marginBottom: 6, textAlign: "center" }}>What kind of trip?</div>
-        <div style={{ color: T.textMid, fontSize: 14, marginBottom: 40, textAlign: "center" }}>This helps us set up the right tracking for you.</div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%", maxWidth: 340 }}>
-          <Card onClick={() => setTripType("single")} style={{ cursor: "pointer", padding: 24, textAlign: "center" }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>📍</div>
-            <div style={{ color: T.text, fontSize: 18, fontWeight: 800, marginBottom: 6 }}>One Destination</div>
-            <div style={{ color: T.textMid, fontSize: 13 }}>A single round trip. USA → Puerto Rico → home.</div>
-          </Card>
-          <Card onClick={() => setTripType("multi")} style={{ cursor: "pointer", padding: 24, textAlign: "center", borderColor: T.purple + "44" }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>🗺️</div>
-            <div style={{ color: T.purple, fontSize: 18, fontWeight: 800, marginBottom: 6 }}>Multi-Leg Journey</div>
-            <div style={{ color: T.textMid, fontSize: 13 }}>Multiple stops. USA → Cuba → France → home.</div>
-          </Card>
+      <div style={{ minHeight: "100vh", padding: "40px 20px 60px", display: "flex", flexDirection: "column" }}>
+        {onBack && <BackButton onClick={onBack} label="Back to Trip" />}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ fontSize: 28, fontWeight: 900, color: T.text, marginBottom: 6, textAlign: "center" }}>What kind of trip?</div>
+          <div style={{ color: T.textMid, fontSize: 14, marginBottom: 40, textAlign: "center" }}>This helps us set up the right tracking for you.</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%", maxWidth: 340 }}>
+            <Card onClick={() => setTripType("single")} style={{ cursor: "pointer", padding: 24, textAlign: "center" }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>📍</div>
+              <div style={{ color: T.text, fontSize: 18, fontWeight: 800, marginBottom: 6 }}>One Destination</div>
+              <div style={{ color: T.textMid, fontSize: 13 }}>A single round trip. USA → Puerto Rico → home.</div>
+            </Card>
+            <Card onClick={() => setTripType("multi")} style={{ cursor: "pointer", padding: 24, textAlign: "center", borderColor: T.purple + "44" }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>🗺️</div>
+              <div style={{ color: T.purple, fontSize: 18, fontWeight: 800, marginBottom: 6 }}>Multi-Leg Journey</div>
+              <div style={{ color: T.textMid, fontSize: 13 }}>Multiple stops. USA → Cuba → France → home.</div>
+            </Card>
+          </div>
         </div>
       </div>
     );
@@ -875,7 +878,7 @@ function ReportsScreen({ expenses, trip, setScreen }) {
 }
 
 // ─── SETTINGS ─────────────────────────────────────────────────────
-function SettingsScreen({ trip, onUpdateTrip, onClearData, onDeleteTrip, onBack, user, profile, isPro, onSignOut, onInstall, isInstalled }) {
+function SettingsScreen({ trip, onUpdateTrip, onClearData, onDeleteTrip, onNewTrip, onBack, user, profile, isPro, onSignOut, onInstall, isInstalled }) {
   const [form, setForm] = useState({ ...trip, budget: String(trip.budget) });
   const [legs, setLegs] = useState(trip.legs ? trip.legs.map(l => ({ ...l, budget: String(l.budget) })) : []);
   const [confirmClear, setConfirmClear] = useState(false);
@@ -934,6 +937,9 @@ function SettingsScreen({ trip, onUpdateTrip, onClearData, onDeleteTrip, onBack,
           </div>
           {!isInstalled && onInstall && (
             <button onClick={onInstall} style={{ width: "100%", background: `linear-gradient(135deg, ${T.accent}22, ${T.purple}22)`, color: T.accent, border: `1px solid ${T.accent}44`, borderRadius: 12, padding: 14, fontSize: 14, fontWeight: 700, cursor: "pointer", marginBottom: 10 }}>📲 Install on Home Screen</button>
+          )}
+          {onNewTrip && (
+            <button onClick={onNewTrip} style={{ width: "100%", background: T.purple + "22", color: T.purple, border: `1px solid ${T.purple}44`, borderRadius: 12, padding: 14, fontSize: 14, fontWeight: 700, cursor: "pointer", marginBottom: 10 }}>🧳 Create New Trip</button>
           )}
           <button onClick={onSignOut} style={{ width: "100%", background: T.card, color: T.textMid, border: `1px solid ${T.border}`, borderRadius: 12, padding: 12, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>🚪 Sign Out</button>
         </Card>
@@ -1100,13 +1106,14 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
           <div style={{ display: "flex", gap: 4, alignItems: "center" }}><span style={{ fontSize: 18, fontWeight: 900, color: T.text }}>My</span><span style={{ fontSize: 18, fontWeight: 900, color: T.accent }}>Trip</span><span style={{ fontSize: 18, fontWeight: 900, color: T.text }}>Money</span></div>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             <span style={{ color: T.textMid, fontSize: 12 }}>{curByCode(trip.currency).flag} {trip.isMultiLeg ? `${trip.legs.length} legs` : trip.destination}</span>
+            <button onClick={() => { if (confirm("Switch to a new trip? Your current trip will be saved.")) { setScreen("create-trip"); } }} title="Switch Trip" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, padding: 0, color: T.textDim }}>🔄</button>
             <button onClick={() => setScreen("settings")} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, padding: 0, color: T.textDim }}>⚙️</button>
           </div>
         </div>
       )}
       <div>
         {screen === "welcome" && <WelcomeScreen onStart={() => { setTrip(DEFAULT_TRIP); setExpenses(SEED_EXPENSES); setScreen("dashboard"); }} onCreateTrip={() => setScreen("create-trip")} onInstall={onInstall} isInstalled={isInstalled} canInstall={canInstall} isIOS={isIOS} isMobile={isMobile} />}
-        {screen === "create-trip" && <CreateTripScreen onSave={t => { setTrip(t); setExpenses([]); setScreen("dashboard"); }} />}
+        {screen === "create-trip" && <CreateTripScreen onSave={t => { setTrip(t); setExpenses([]); setScreen("dashboard"); }} onBack={trip && trip.name && expenses.length >= 0 ? () => setScreen("dashboard") : null} />}
         {screen === "dashboard" && <DashboardScreen expenses={expenses} trip={trip} setScreen={setScreen} setSelectedExpense={setSelectedExpense} />}
         {screen === "history" && <HistoryScreen expenses={expenses} trip={trip} setScreen={setScreen} setSelectedExpense={setSelectedExpense} />}
         {screen === "add" && <AddExpenseScreen onSave={addExpense} onBack={() => setScreen("dashboard")} trip={trip} />}
@@ -1114,7 +1121,7 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
         {screen === "budget" && <BudgetScreen expenses={expenses} trip={trip} />}
         {screen === "reports" && <ReportsScreen expenses={expenses} trip={trip} setScreen={setScreen} />}
         {screen === "expense-detail" && <ExpenseDetailScreen expense={selectedExpense} trip={trip} setScreen={setScreen} onDelete={deleteExpense} onDuplicate={duplicateExpense} onEdit={handleEdit} />}
-        {screen === "settings" && <SettingsScreen trip={trip} onUpdateTrip={setTrip} onClearData={() => { setExpenses([]); setScreen("dashboard"); }} onDeleteTrip={() => { setExpenses([]); setTrip(DEFAULT_TRIP); localStorage.removeItem("tm-trip"); localStorage.removeItem("tm-expenses"); localStorage.removeItem("tm-screen"); setScreen("welcome"); screenHistory.current = ["welcome"]; }} onBack={() => setScreen("dashboard")} user={user} profile={profile} isPro={isPro} onSignOut={onSignOut} onInstall={onInstall} isInstalled={isInstalled} />}
+        {screen === "settings" && <SettingsScreen trip={trip} onUpdateTrip={setTrip} onClearData={() => { setExpenses([]); setScreen("dashboard"); }} onDeleteTrip={() => { setExpenses([]); setTrip(DEFAULT_TRIP); localStorage.removeItem("tm-trip"); localStorage.removeItem("tm-expenses"); localStorage.removeItem("tm-screen"); setScreen("welcome"); screenHistory.current = ["welcome"]; }} onNewTrip={() => setScreen("create-trip")} onBack={() => setScreen("dashboard")} user={user} profile={profile} isPro={isPro} onSignOut={onSignOut} onInstall={onInstall} isInstalled={isInstalled} />}
         {screen === "email-report" && <EmailReportScreen trip={trip} expenses={expenses} onBack={() => setScreen("reports")} />}
       </div>
       {showQuickAdd && <QuickAddSheet onSave={addExpense} onFullForm={() => { setShowQuickAdd(false); setScreen("add"); }} onClose={() => setShowQuickAdd(false)} trip={trip} />}
