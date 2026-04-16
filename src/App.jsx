@@ -4,6 +4,7 @@ import { AuthScreen } from './AuthScreen.jsx';
 import { PaywallScreen } from './PaywallScreen.jsx';
 import LandingPage from './LandingPage.jsx';
 import TripApp from './TripApp.jsx';
+import { useInstallPrompt, InstallModal } from './InstallPrompt.jsx';
 
 const T = {
   bg: "#0A0F1E", accent: "#00D4FF", text: "#F0F4FF", textMid: "#8A9BC4", textDim: "#4A5880",
@@ -38,52 +39,44 @@ export default function App() {
   const [paywallFeature, setPaywallFeature] = useState("");
   const [minLoadDone, setMinLoadDone] = useState(false);
 
-  // Minimum loading time so the splash doesn't flash
+  const { triggerInstall, canInstall, isInstalled, isIOS, isAndroid } = useInstallPrompt();
+  const [showInstallModal, setShowInstallModal] = useState(false);
+
   useEffect(() => {
-    const timer = setTimeout(() => setMinLoadDone(true), 1500);
+    const timer = setTimeout(() => setMinLoadDone(true), 3000);
     return () => clearTimeout(timer);
   }, []);
 
-  // Route based on auth state
   useEffect(() => {
     if (loading) return;
-    if (user) {
-      setView("app");
-    }
+    if (user) setView("app");
   }, [user, loading]);
 
-  // Show loading until BOTH auth loaded AND minimum time passed
   if (loading || !minLoadDone) return <LoadingScreen />;
 
-  // Landing page (not logged in)
-  if (view === "landing" && !user) {
-    return <LandingPage
-      onGetStarted={() => setView("auth")}
-      onLogin={() => setView("auth")}
-    />;
-  }
+  const renderView = () => {
+    if (view === "landing" && !user) {
+      return <LandingPage
+        onGetStarted={() => setView("auth")}
+        onLogin={() => setView("auth")}
+        onInstall={() => setShowInstallModal(true)}
+        canInstall={canInstall}
+        isInstalled={isInstalled}
+        isIOS={isIOS}
+        isAndroid={isAndroid}
+        triggerInstall={triggerInstall}
+      />;
+    }
+    if (view === "auth" && !user) return <AuthScreen onBack={() => setView("landing")} />;
+    if (view === "paywall") return <PaywallScreen feature={paywallFeature} onBack={() => setView("app")} />;
+    if (user) return <TripApp user={user} profile={profile} isPro={isPro} onSignOut={signOut} onInstall={() => setShowInstallModal(true)} isInstalled={isInstalled} onPaywall={(feature) => { setPaywallFeature(feature); setView("paywall"); }} />;
+    return <LandingPage onGetStarted={() => setView("auth")} onLogin={() => setView("auth")} />;
+  };
 
-  // Auth screen
-  if (view === "auth" && !user) {
-    return <AuthScreen onBack={() => setView("landing")} />;
-  }
-
-  // Paywall
-  if (view === "paywall") {
-    return <PaywallScreen feature={paywallFeature} onBack={() => setView("app")} />;
-  }
-
-  // Main app (logged in)
-  if (user) {
-    return <TripApp
-      user={user}
-      profile={profile}
-      isPro={isPro}
-      onSignOut={signOut}
-      onPaywall={(feature) => { setPaywallFeature(feature); setView("paywall"); }}
-    />;
-  }
-
-  // Fallback
-  return <LandingPage onGetStarted={() => setView("auth")} onLogin={() => setView("auth")} />;
+  return (
+    <>
+      {renderView()}
+      {showInstallModal && <InstallModal onClose={() => setShowInstallModal(false)} isIOS={isIOS} isAndroid={isAndroid} canInstall={canInstall} triggerInstall={triggerInstall} />}
+    </>
+  );
 }
