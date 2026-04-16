@@ -13,10 +13,26 @@ const inputStyle = {
   padding: "14px 16px", color: T.text, fontSize: 16, boxSizing: "border-box", outline: "none", fontFamily: "inherit",
 };
 
+function PasswordInput({ value, onChange, placeholder, onKeyDown }) {
+  const [show, setShow] = useState(false);
+  return (
+    <div style={{ position: "relative" }}>
+      <input value={value} onChange={onChange} type={show ? "text" : "password"} placeholder={placeholder}
+        style={{ ...inputStyle, paddingRight: 48 }} onKeyDown={onKeyDown} />
+      <button onClick={() => setShow(!show)} style={{
+        position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)",
+        background: "none", border: "none", cursor: "pointer", fontSize: 18, padding: 4,
+        color: T.textDim,
+      }}>{show ? "🙈" : "👁️"}</button>
+    </div>
+  );
+}
+
 export function AuthScreen({ onBack }) {
-  const [mode, setMode] = useState("login"); // login or signup
+  const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -28,11 +44,15 @@ export function AuthScreen({ onBack }) {
     setLoading(true);
     try {
       if (mode === "signup") {
-        if (!fullName) { setError("Enter your name"); setLoading(false); return; }
+        if (!fullName.trim()) { setError("Please enter your name"); setLoading(false); return; }
+        if (!email.trim()) { setError("Please enter your email"); setLoading(false); return; }
         if (password.length < 6) { setError("Password must be at least 6 characters"); setLoading(false); return; }
+        if (password !== confirmPassword) { setError("Passwords do not match"); setLoading(false); return; }
         await signUp(email, password, fullName);
         setCheckEmail(true);
       } else {
+        if (!email.trim()) { setError("Please enter your email"); setLoading(false); return; }
+        if (!password) { setError("Please enter your password"); setLoading(false); return; }
         await signIn(email, password);
       }
     } catch (e) {
@@ -82,24 +102,39 @@ export function AuthScreen({ onBack }) {
           <input value={email} onChange={e => setEmail(e.target.value)} type="email" placeholder="you@example.com" style={inputStyle} />
         </div>
 
-        <div style={{ marginBottom: 24 }}>
+        <div style={{ marginBottom: mode === "signup" ? 14 : 24 }}>
           <div style={{ color: T.textMid, fontSize: 12, fontWeight: 600, textTransform: "uppercase", marginBottom: 6 }}>Password</div>
-          <input value={password} onChange={e => setPassword(e.target.value)} type="password" placeholder={mode === "signup" ? "At least 6 characters" : "Your password"} style={inputStyle}
-            onKeyDown={e => e.key === "Enter" && handleSubmit()} />
+          <PasswordInput value={password} onChange={e => setPassword(e.target.value)} placeholder={mode === "signup" ? "At least 6 characters" : "Your password"}
+            onKeyDown={e => e.key === "Enter" && mode === "login" && handleSubmit()} />
         </div>
 
-        <button onClick={handleSubmit} disabled={loading || !email || !password} style={{
-          width: "100%", background: (email && password && !loading) ? T.accent : T.border,
-          color: (email && password && !loading) ? T.bg : T.textDim,
+        {mode === "signup" && (
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ color: T.textMid, fontSize: 12, fontWeight: 600, textTransform: "uppercase", marginBottom: 6 }}>Confirm Password</div>
+            <PasswordInput value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Type password again"
+              onKeyDown={e => e.key === "Enter" && handleSubmit()} />
+            {confirmPassword && password && confirmPassword !== password && (
+              <div style={{ color: T.red, fontSize: 12, fontWeight: 600, marginTop: 6 }}>Passwords do not match</div>
+            )}
+            {confirmPassword && password && confirmPassword === password && (
+              <div style={{ color: T.green, fontSize: 12, fontWeight: 600, marginTop: 6 }}>✓ Passwords match</div>
+            )}
+          </div>
+        )}
+
+        <button onClick={handleSubmit} disabled={loading || !email || !password || (mode === "signup" && password !== confirmPassword)} style={{
+          width: "100%",
+          background: (email && password && !loading && (mode === "login" || password === confirmPassword)) ? T.accent : T.border,
+          color: (email && password && !loading && (mode === "login" || password === confirmPassword)) ? T.bg : T.textDim,
           border: "none", borderRadius: 14, padding: "16px", fontSize: 17, fontWeight: 900,
-          cursor: (email && password && !loading) ? "pointer" : "not-allowed",
+          cursor: (email && password && !loading && (mode === "login" || password === confirmPassword)) ? "pointer" : "not-allowed",
           marginBottom: 20,
         }}>
           {loading ? "Please wait..." : mode === "login" ? "Sign In" : "Create Account"}
         </button>
 
         <div style={{ textAlign: "center" }}>
-          <button onClick={() => { setMode(mode === "login" ? "signup" : "login"); setError(""); }} style={{ background: "none", border: "none", color: T.accent, fontSize: 14, cursor: "pointer", fontWeight: 600 }}>
+          <button onClick={() => { setMode(mode === "login" ? "signup" : "login"); setError(""); setConfirmPassword(""); }} style={{ background: "none", border: "none", color: T.accent, fontSize: 14, cursor: "pointer", fontWeight: 600 }}>
             {mode === "login" ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}
           </button>
         </div>
