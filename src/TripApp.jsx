@@ -859,10 +859,11 @@ function ReportsScreen({ expenses, trip, setScreen }) {
 }
 
 // ─── SETTINGS ─────────────────────────────────────────────────────
-function SettingsScreen({ trip, onUpdateTrip, onClearData, onBack, user, profile, isPro, onSignOut, onInstall, isInstalled }) {
+function SettingsScreen({ trip, onUpdateTrip, onClearData, onDeleteTrip, onBack, user, profile, isPro, onSignOut, onInstall, isInstalled }) {
   const [form, setForm] = useState({ ...trip, budget: String(trip.budget) });
   const [legs, setLegs] = useState(trip.legs ? trip.legs.map(l => ({ ...l, budget: String(l.budget) })) : []);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [saved, setSaved] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -970,8 +971,40 @@ function SettingsScreen({ trip, onUpdateTrip, onClearData, onBack, user, profile
 
       <Card style={{ borderColor: T.red + "33" }}>
         <div style={{ color: T.red, fontSize: 12, fontWeight: 700, textTransform: "uppercase", marginBottom: 10 }}>Danger Zone</div>
-        {!confirmClear ? <button onClick={() => setConfirmClear(true)} style={{ width: "100%", background: T.red + "15", color: T.red, border: `1px solid ${T.red}33`, borderRadius: 12, padding: 14, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>🗑️ Clear All Data</button> : (
-          <div style={{ display: "flex", gap: 10 }}><button onClick={() => setConfirmClear(false)} style={{ flex: 1, background: T.card, color: T.textMid, border: `1px solid ${T.border}`, borderRadius: 12, padding: 12, fontWeight: 700, cursor: "pointer" }}>Cancel</button><button onClick={() => { onClearData(); setConfirmClear(false); }} style={{ flex: 1, background: T.red, color: "#fff", border: "none", borderRadius: 12, padding: 12, fontWeight: 900, cursor: "pointer" }}>Confirm</button></div>
+
+        {/* Clear expenses */}
+        {!confirmClear ? (
+          <button onClick={() => setConfirmClear(true)} style={{ width: "100%", background: T.red + "10", color: T.red, border: `1px solid ${T.red}33`, borderRadius: 12, padding: 14, fontSize: 14, fontWeight: 700, cursor: "pointer", marginBottom: 10 }}>
+            🧹 Clear All Expenses
+            <div style={{ fontSize: 11, fontWeight: 400, opacity: 0.8, marginTop: 2 }}>Keeps the trip but removes all expenses</div>
+          </button>
+        ) : (
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ color: T.text, fontSize: 13, marginBottom: 8, textAlign: "center" }}>Delete all expenses for this trip?</div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setConfirmClear(false)} style={{ flex: 1, background: T.card, color: T.textMid, border: `1px solid ${T.border}`, borderRadius: 12, padding: 12, fontWeight: 700, cursor: "pointer" }}>Cancel</button>
+              <button onClick={() => { onClearData(); setConfirmClear(false); }} style={{ flex: 1, background: T.red, color: "#fff", border: "none", borderRadius: 12, padding: 12, fontWeight: 900, cursor: "pointer" }}>Clear Expenses</button>
+            </div>
+          </div>
+        )}
+
+        {/* Delete entire trip */}
+        {onDeleteTrip && (
+          !confirmDelete ? (
+            <button onClick={() => setConfirmDelete(true)} style={{ width: "100%", background: T.red + "22", color: T.red, border: `1px solid ${T.red}66`, borderRadius: 12, padding: 14, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+              🗑️ Delete This Trip
+              <div style={{ fontSize: 11, fontWeight: 400, opacity: 0.8, marginTop: 2 }}>Permanently remove the trip and all expenses</div>
+            </button>
+          ) : (
+            <div>
+              <div style={{ color: T.red, fontSize: 13, marginBottom: 8, textAlign: "center", fontWeight: 700 }}>⚠️ Delete "{trip.name}" forever?</div>
+              <div style={{ color: T.textMid, fontSize: 12, marginBottom: 10, textAlign: "center" }}>This cannot be undone.</div>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button onClick={() => setConfirmDelete(false)} style={{ flex: 1, background: T.card, color: T.textMid, border: `1px solid ${T.border}`, borderRadius: 12, padding: 12, fontWeight: 700, cursor: "pointer" }}>Cancel</button>
+                <button onClick={() => { onDeleteTrip(); setConfirmDelete(false); }} style={{ flex: 1, background: T.red, color: "#fff", border: "none", borderRadius: 12, padding: 12, fontWeight: 900, cursor: "pointer" }}>Delete Forever</button>
+              </div>
+            </div>
+          )
         )}
       </Card>
     </div>
@@ -1065,7 +1098,7 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
         {screen === "budget" && <BudgetScreen expenses={expenses} trip={trip} />}
         {screen === "reports" && <ReportsScreen expenses={expenses} trip={trip} setScreen={setScreen} />}
         {screen === "expense-detail" && <ExpenseDetailScreen expense={selectedExpense} trip={trip} setScreen={setScreen} onDelete={deleteExpense} onDuplicate={duplicateExpense} onEdit={handleEdit} />}
-        {screen === "settings" && <SettingsScreen trip={trip} onUpdateTrip={setTrip} onClearData={() => { setExpenses([]); setScreen("welcome"); localStorage.clear(); }} onBack={() => setScreen("dashboard")} user={user} profile={profile} isPro={isPro} onSignOut={onSignOut} onInstall={onInstall} isInstalled={isInstalled} />}
+        {screen === "settings" && <SettingsScreen trip={trip} onUpdateTrip={setTrip} onClearData={() => { setExpenses([]); setScreen("dashboard"); }} onDeleteTrip={() => { setExpenses([]); setTrip(DEFAULT_TRIP); localStorage.removeItem("tm-trip"); localStorage.removeItem("tm-expenses"); localStorage.removeItem("tm-screen"); setScreen("welcome"); screenHistory.current = ["welcome"]; }} onBack={() => setScreen("dashboard")} user={user} profile={profile} isPro={isPro} onSignOut={onSignOut} onInstall={onInstall} isInstalled={isInstalled} />}
         {screen === "email-report" && <EmailReportScreen trip={trip} expenses={expenses} onBack={() => setScreen("reports")} />}
       </div>
       {showQuickAdd && <QuickAddSheet onSave={addExpense} onFullForm={() => { setShowQuickAdd(false); setScreen("add"); }} onClose={() => setShowQuickAdd(false)} trip={trip} />}
