@@ -40,7 +40,7 @@ export default function App() {
 
   // Minimum loading time so the splash doesn't flash
   useEffect(() => {
-    const timer = setTimeout(() => setMinLoadDone(true), 3000);
+    const timer = setTimeout(() => setMinLoadDone(true), 1500);
     return () => clearTimeout(timer);
   }, []);
 
