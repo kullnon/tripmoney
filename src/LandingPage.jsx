@@ -7,10 +7,23 @@ const T = {
   text: "#F0F4FF", textMid: "#8A9BC4", textDim: "#4A5880",
 };
 
-export default function LandingPage({ onGetStarted, onLogin }) {
+export default function LandingPage({ onGetStarted, onLogin, onInstall, canInstall, isInstalled, isIOS, isAndroid, triggerInstall }) {
   const [annual, setAnnual] = useState(true);
   const [emailInput, setEmailInput] = useState("");
   const [scrollY, setScrollY] = useState(0);
+  const [installing, setInstalling] = useState(false);
+
+  const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+  const handleInstallClick = async () => {
+    if (canInstall && triggerInstall) {
+      setInstalling(true);
+      await triggerInstall();
+      setInstalling(false);
+    } else if (onInstall) {
+      onInstall();
+    }
+  };
 
   useEffect(() => {
     const handleScroll = () => setScrollY(window.scrollY);
@@ -205,6 +218,93 @@ export default function LandingPage({ onGetStarted, onLogin }) {
           </div>
         </Section>
       </section>
+
+      {/* ─── INSTALL SECTION ─── */}
+      {!isInstalled && (
+        <section style={{ padding: "50px 0", borderTop: `1px solid ${T.border}` }}>
+          <Section>
+            <div style={{
+              background: `linear-gradient(135deg, ${T.accent}18, ${T.purple}18)`,
+              border: `2px solid ${T.accent}44`,
+              borderRadius: 24,
+              padding: "32px 24px",
+              textAlign: "center",
+              maxWidth: 640,
+              margin: "0 auto",
+              position: "relative",
+              overflow: "hidden",
+            }}>
+              <div style={{ position: "absolute", top: -40, right: -40, width: 200, height: 200, background: `radial-gradient(circle, ${T.accent}22 0%, transparent 70%)`, pointerEvents: "none" }} />
+
+              <img src="/pwa-192x192.png" alt="" style={{ width: 72, height: 72, marginBottom: 16, position: "relative" }} onError={e => e.target.style.display = "none"} />
+
+              <div style={{ display: "inline-block", background: T.accent + "22", color: T.accent, fontSize: 11, fontWeight: 800, padding: "4px 12px", borderRadius: 99, marginBottom: 12, textTransform: "uppercase", letterSpacing: 1 }}>
+                📲 Install the App
+              </div>
+
+              <h3 style={{ fontFamily: "Sora", fontSize: "clamp(22px, 3.5vw, 30px)", fontWeight: 900, color: T.text, marginBottom: 10, letterSpacing: -0.5 }}>
+                Install MyTripMoney on your homepage
+              </h3>
+              <p style={{ color: T.textMid, fontSize: 15, marginBottom: 24, maxWidth: 440, margin: "0 auto 24px", lineHeight: 1.6 }}>
+                Add it to your home screen like a real app — no app store needed. Works offline and syncs when you're back online.
+              </p>
+
+              {/* Android with native install API */}
+              {canInstall && (
+                <button onClick={handleInstallClick} disabled={installing} className="cta-btn" style={{
+                  background: T.accent, color: T.bg, border: "none", borderRadius: 14,
+                  padding: "16px 36px", fontSize: 17, fontWeight: 900,
+                  cursor: installing ? "not-allowed" : "pointer",
+                  display: "inline-flex", alignItems: "center", gap: 10,
+                }}>
+                  {installing ? "Installing..." : "📲 Install Now"}
+                </button>
+              )}
+
+              {/* iPhone / iPad instructions */}
+              {!canInstall && isIOS && (
+                <div style={{ background: T.bg, borderRadius: 16, padding: 20, textAlign: "left", maxWidth: 400, margin: "0 auto" }}>
+                  <div style={{ color: T.accent, fontSize: 13, fontWeight: 700, marginBottom: 14, textAlign: "center" }}>📱 On iPhone / iPad Safari</div>
+                  {[
+                    ["1", <>Tap the <strong>Share button</strong> <span style={{ color: T.accent }}>⬆️</span> at the bottom</>],
+                    ["2", <>Scroll down and tap <strong>"Add to Home Screen"</strong></>],
+                    ["3", <>Tap <strong>"Add"</strong> in the top-right</>],
+                  ].map(([n, txt], i) => (
+                    <div key={n} style={{ display: "flex", gap: 12, alignItems: "flex-start", marginBottom: i < 2 ? 12 : 0 }}>
+                      <div style={{ minWidth: 26, height: 26, borderRadius: "50%", background: T.accent + "22", color: T.accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800 }}>{n}</div>
+                      <div style={{ color: T.text, fontSize: 14, lineHeight: 1.6 }}>{txt}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Android Chrome fallback (no native prompt available) */}
+              {!canInstall && !isIOS && isMobile && (
+                <div style={{ background: T.bg, borderRadius: 16, padding: 20, textAlign: "left", maxWidth: 400, margin: "0 auto" }}>
+                  <div style={{ color: T.accent, fontSize: 13, fontWeight: 700, marginBottom: 14, textAlign: "center" }}>📱 On Android Chrome</div>
+                  {[
+                    ["1", <>Tap the <strong>⋮ menu</strong> (top-right)</>],
+                    ["2", <>Tap <strong>"Install app"</strong> or <strong>"Add to Home screen"</strong></>],
+                    ["3", <>Tap <strong>"Install"</strong> to confirm</>],
+                  ].map(([n, txt], i) => (
+                    <div key={n} style={{ display: "flex", gap: 12, alignItems: "flex-start", marginBottom: i < 2 ? 12 : 0 }}>
+                      <div style={{ minWidth: 26, height: 26, borderRadius: "50%", background: T.accent + "22", color: T.accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800 }}>{n}</div>
+                      <div style={{ color: T.text, fontSize: 14, lineHeight: 1.6 }}>{txt}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Desktop */}
+              {!isMobile && (
+                <div style={{ color: T.textMid, fontSize: 14, lineHeight: 1.6, maxWidth: 420, margin: "0 auto" }}>
+                  💻 You're on desktop. Open <strong style={{ color: T.accent }}>mymoneytrip.com</strong> on your phone to install it to your home screen.
+                </div>
+              )}
+            </div>
+          </Section>
+        </section>
+      )}
 
       {/* ─── SOCIAL PROOF BAR ─── */}
       <section style={{ padding: "40px 0", borderTop: `1px solid ${T.border}`, borderBottom: `1px solid ${T.border}` }}>
