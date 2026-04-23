@@ -360,7 +360,7 @@ function WelcomeScreen({ onStart, onCreateTrip, onInstall, isInstalled, canInsta
 }
 
 // ─── CREATE TRIP ──────────────────────────────────────────────────
-function CreateTripScreen({ onSave, onBack }) {
+function CreateTripScreen({ onSave, onBack, isPro, onPaywall }) {
   const [tripType, setTripType] = useState(null); // null, "single", "multi"
   const [form, setForm] = useState({ name: "", destination: "", departureDate: "", returnDate: "", budget: "2500", currency: "USD" });
   const [legs, setLegs] = useState([{ id: 1, from: "", to: "", departureDate: "", returnDate: "", budget: "", currency: "USD" }]);
@@ -406,7 +406,7 @@ function CreateTripScreen({ onSave, onBack }) {
               <div style={{ color: T.text, fontSize: 18, fontWeight: 800, marginBottom: 6 }}>One Destination</div>
               <div style={{ color: T.textMid, fontSize: 13 }}>A single round trip. USA → Puerto Rico → home.</div>
             </Card>
-            <Card onClick={() => setTripType("multi")} style={{ cursor: "pointer", padding: 24, textAlign: "center", borderColor: T.purple + "44" }}>
+            <Card onClick={() => { if (!isPro && onPaywall) { onPaywall("Multi-leg journeys"); return; } setTripType("multi"); }} style={{ cursor: "pointer", padding: 24, textAlign: "center", borderColor: T.purple + "44" }}>
               <div style={{ fontSize: 40, marginBottom: 12 }}>🗺️</div>
               <div style={{ color: T.purple, fontSize: 18, fontWeight: 800, marginBottom: 6 }}>Multi-Leg Journey</div>
               <div style={{ color: T.textMid, fontSize: 13 }}>Multiple stops. USA → Cuba → France → home.</div>
@@ -1116,7 +1116,7 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
       )}
       <div>
         {screen === "welcome" && <WelcomeScreen onStart={() => { setTrip(DEFAULT_TRIP); setExpenses(SEED_EXPENSES); setScreen("dashboard"); }} onCreateTrip={() => setScreen("create-trip")} onInstall={onInstall} isInstalled={isInstalled} canInstall={canInstall} isIOS={isIOS} isMobile={isMobile} />}
-        {screen === "create-trip" && <CreateTripScreen onSave={t => { setTrip(t); setExpenses([]); setScreen("dashboard"); }} onBack={trip && trip.name && expenses.length >= 0 ? () => setScreen("dashboard") : null} />}
+        {screen === "create-trip" && <CreateTripScreen onSave={t => { setTrip(t); setExpenses([]); setScreen("dashboard"); }} onBack={trip && trip.name && expenses.length >= 0 ? () => setScreen("dashboard") : null} isPro={isPro} onPaywall={onPaywall} />}
         {screen === "dashboard" && <DashboardScreen expenses={expenses} trip={trip} setScreen={setScreen} setSelectedExpense={setSelectedExpense} />}
         {screen === "history" && <HistoryScreen expenses={expenses} trip={trip} setScreen={setScreen} setSelectedExpense={setSelectedExpense} />}
         {screen === "add" && <AddExpenseScreen onSave={addExpense} onBack={() => setScreen("dashboard")} trip={trip} />}
@@ -1135,7 +1135,7 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
       )}
       {isNav && (
         <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 390, background: T.surface + "F0", backdropFilter: "blur(16px)", borderTop: `1px solid ${T.border}`, display: "flex", zIndex: 100, paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
-          {NAV.map(({ id, icon, label }) => <button key={id} onClick={() => setScreen(id)} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", padding: "10px 0 12px", background: "none", border: "none", cursor: "pointer", gap: 3 }}><span style={{ fontSize: 20 }}>{icon}</span><span style={{ fontSize: 10, fontWeight: 700, color: screen === id ? T.accent : T.textDim }}>{label}</span>{screen === id && <div style={{ width: 20, height: 2, background: T.accent, borderRadius: 99 }} />}</button>)}
+          {NAV.map(({ id, icon, label }) => <button key={id} onClick={() => { if (id === "reports" && !isPro) { onPaywall("Reports"); return; } setScreen(id); }} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", padding: "10px 0 12px", background: "none", border: "none", cursor: "pointer", gap: 3 }}><span style={{ fontSize: 20 }}>{icon}</span><span style={{ fontSize: 10, fontWeight: 700, color: screen === id ? T.accent : T.textDim }}>{label}</span>{screen === id && <div style={{ width: 20, height: 2, background: T.accent, borderRadius: 99 }} />}</button>)}
         </div>
       )}
     </div>
