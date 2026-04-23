@@ -1,4 +1,4 @@
-const Stripe = require('stripe');
+import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -7,7 +7,7 @@ const PRICES = {
   annual: 'price_1TPQ2VJVPirYifUyGimsXUbR',
 };
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -16,28 +16,21 @@ module.exports = async function handler(req, res) {
     const { plan, userId, email } = req.body;
 
     if (!plan || !PRICES[plan]) {
-      return res.status(400).json({ error: 'Invalid plan. Use "monthly" or "annual".' });
+      return res.status(400).json({ error: 'Invalid plan.' });
     }
 
     if (!userId || !email) {
       return res.status(400).json({ error: 'Missing userId or email.' });
     }
 
-    const origin = req.headers.origin || 'https://mymoneytrip.com';
+    const origin = req.headers.origin || 'https://mytripmoney.com';
 
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       payment_method_types: ['card'],
       customer_email: email,
-      line_items: [
-        {
-          price: PRICES[plan],
-          quantity: 1,
-        },
-      ],
-      metadata: {
-        supabase_user_id: userId,
-      },
+      line_items: [{ price: PRICES[plan], quantity: 1 }],
+      metadata: { supabase_user_id: userId },
       success_url: origin + '?checkout=success',
       cancel_url: origin + '?checkout=cancel',
     });
@@ -47,4 +40,4 @@ module.exports = async function handler(req, res) {
     console.error('Stripe checkout error:', err);
     return res.status(500).json({ error: err.message });
   }
-};
+}
