@@ -6,8 +6,39 @@ const T = {
   text: "#F0F4FF", textMid: "#8A9BC4", textDim: "#4A5880",
 };
 
-export function PaywallScreen({ feature, onBack }) {
+export function PaywallScreen({ feature, onBack, user }) {
   const [annual, setAnnual] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleUpgrade() {
+    setLoading(true);
+    setError('');
+
+    try {
+      const res = await fetch('/api/create-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          plan: annual ? 'annual' : 'monthly',
+          userId: user?.id,
+          email: user?.email,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        setError(data.error || 'Something went wrong. Please try again.');
+      }
+    } catch (err) {
+      setError('Could not connect to payment server. Please try again.');
+    }
+
+    setLoading(false);
+  }
 
   return (
     <div style={{ minHeight: "100vh", background: T.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 24px", textAlign: "center" }}>
@@ -34,7 +65,20 @@ export function PaywallScreen({ feature, onBack }) {
         </div>
         <div style={{ color: T.textMid, fontSize: 13, marginBottom: 24 }}>{annual ? "Billed $79.99/year" : "Billed monthly"}</div>
 
-        <button style={{ width: "100%", background: T.accent, color: T.bg, border: "none", borderRadius: 14, padding: "15px", fontSize: 17, fontWeight: 900, cursor: "pointer", marginBottom: 20 }}>Upgrade Now →</button>
+        <button
+          onClick={handleUpgrade}
+          disabled={loading}
+          style={{
+            width: "100%", background: loading ? T.textDim : T.accent, color: T.bg,
+            border: "none", borderRadius: 14, padding: "15px", fontSize: 17,
+            fontWeight: 900, cursor: loading ? "not-allowed" : "pointer", marginBottom: 20,
+            opacity: loading ? 0.7 : 1,
+          }}
+        >
+          {loading ? "Connecting..." : "Upgrade Now →"}
+        </button>
+
+        {error && <div style={{ color: "#FF6B6B", fontSize: 13, marginBottom: 12 }}>{error}</div>}
 
         <div style={{ display: "flex", flexDirection: "column", gap: 10, textAlign: "left" }}>
           {["Unlimited trips", "Multi-leg journeys", "100+ currencies", "PDF & email reports", "Cloud sync", "All future features"].map(f => (

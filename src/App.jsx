@@ -68,7 +68,7 @@ export default function App() {
       />;
     }
     if (view === "auth" && !user) return <AuthScreen onBack={() => setView("landing")} />;
-    if (view === "paywall") return <PaywallScreen feature={paywallFeature} onBack={() => setView("app")} />;
+    if (view === "paywall") return <PaywallScreen feature={paywallFeature} onBack={() => setView("app")} user={user} />;
     if (user) return <TripApp user={user} profile={profile} isPro={isPro} onSignOut={signOut} onInstall={() => setShowInstallModal(true)} isInstalled={isInstalled} canInstall={canInstall} isIOS={isIOS} isMobile={/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)} onPaywall={(feature) => { setPaywallFeature(feature); setView("paywall"); }} />;
     return <LandingPage onGetStarted={() => setView("auth")} onLogin={() => setView("auth")} />;
   };
