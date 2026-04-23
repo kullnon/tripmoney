@@ -878,7 +878,7 @@ function ReportsScreen({ expenses, trip, setScreen }) {
 }
 
 // ─── SETTINGS ─────────────────────────────────────────────────────
-function SettingsScreen({ trip, onUpdateTrip, onClearData, onDeleteTrip, onNewTrip, onBack, user, profile, isPro, onSignOut, onInstall, isInstalled }) {
+function SettingsScreen({ trip, onUpdateTrip, onClearData, onDeleteTrip, onNewTrip, onBack, user, profile, isPro, onSignOut, onInstall, isInstalled, onPaywall }) {
   const [form, setForm] = useState({ ...trip, budget: String(trip.budget) });
   const [legs, setLegs] = useState(trip.legs ? trip.legs.map(l => ({ ...l, budget: String(l.budget) })) : []);
   const [confirmClear, setConfirmClear] = useState(false);
@@ -940,6 +940,9 @@ function SettingsScreen({ trip, onUpdateTrip, onClearData, onDeleteTrip, onNewTr
           )}
           {onNewTrip && (
             <button onClick={onNewTrip} style={{ width: "100%", background: T.purple + "22", color: T.purple, border: `1px solid ${T.purple}44`, borderRadius: 12, padding: 14, fontSize: 14, fontWeight: 700, cursor: "pointer", marginBottom: 10 }}>🧳 Create New Trip</button>
+          )}
+          {!isPro && onPaywall && (
+            <button onClick={() => onPaywall("Upgrade")} style={{ width: "100%", background: T.accent + "22", color: T.accent, border: "1px solid " + T.accent + "44", borderRadius: 12, padding: 14, fontSize: 14, fontWeight: 700, cursor: "pointer", marginBottom: 10 }}>⭐ Upgrade to Pro</button>
           )}
           <button onClick={onSignOut} style={{ width: "100%", background: T.card, color: T.textMid, border: `1px solid ${T.border}`, borderRadius: 12, padding: 12, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>🚪 Sign Out</button>
         </Card>
@@ -1121,7 +1124,7 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
         {screen === "budget" && <BudgetScreen expenses={expenses} trip={trip} />}
         {screen === "reports" && <ReportsScreen expenses={expenses} trip={trip} setScreen={setScreen} />}
         {screen === "expense-detail" && <ExpenseDetailScreen expense={selectedExpense} trip={trip} setScreen={setScreen} onDelete={deleteExpense} onDuplicate={duplicateExpense} onEdit={handleEdit} />}
-        {screen === "settings" && <SettingsScreen trip={trip} onUpdateTrip={setTrip} onClearData={() => { setExpenses([]); setScreen("dashboard"); }} onDeleteTrip={() => { setExpenses([]); setTrip(DEFAULT_TRIP); localStorage.removeItem("tm-trip"); localStorage.removeItem("tm-expenses"); localStorage.removeItem("tm-screen"); setScreen("welcome"); screenHistory.current = ["welcome"]; }} onNewTrip={() => setScreen("create-trip")} onBack={() => setScreen("dashboard")} user={user} profile={profile} isPro={isPro} onSignOut={onSignOut} onInstall={onInstall} isInstalled={isInstalled} />}
+        {screen === "settings" && <SettingsScreen trip={trip} onUpdateTrip={setTrip} onClearData={() => { setExpenses([]); setScreen("dashboard"); }} onDeleteTrip={() => { setExpenses([]); setTrip(DEFAULT_TRIP); localStorage.removeItem("tm-trip"); localStorage.removeItem("tm-expenses"); localStorage.removeItem("tm-screen"); setScreen("welcome"); screenHistory.current = ["welcome"]; }} onNewTrip={() => setScreen("create-trip")} onBack={() => setScreen("dashboard")} user={user} profile={profile} isPro={isPro} onSignOut={onSignOut} onInstall={onInstall} isInstalled={isInstalled} onPaywall={onPaywall} />}
         {screen === "email-report" && <EmailReportScreen trip={trip} expenses={expenses} onBack={() => setScreen("reports")} />}
       </div>
       {showQuickAdd && <QuickAddSheet onSave={addExpense} onFullForm={() => { setShowQuickAdd(false); setScreen("add"); }} onClose={() => setShowQuickAdd(false)} trip={trip} />}
