@@ -5,7 +5,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
 const supabase = createClient(
-  process.env.SUPABASE_URL || 'https://ctysqawmqjgyutpofetu.supabase.co',
+  process.env.SUPABASE_URL || 'https://rthpayyevlloxsbzfxuf.supabase.co',
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
