@@ -1037,6 +1037,82 @@ function SettingsScreen({ trip, onUpdateTrip, onClearData, onDeleteTrip, onNewTr
 // ─── APP ──────────────────────────────────────────────────────────
 const NAV = [{ id: "dashboard", icon: "🏠", label: "Home" }, { id: "history", icon: "📋", label: "History" }, { id: "budget", icon: "💰", label: "Budget" }, { id: "reports", icon: "📊", label: "Reports" }];
 
+function TripsListScreen({ user, currentTripDbId, onSelectTrip, onNewTrip, onBack }) {
+  const [trips, setTrips] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [expensesByTrip, setExpensesByTrip] = useState({});
+
+  useEffect(() => {
+    if (!user?.id) return;
+    (async () => {
+      try {
+        const list = await fetchTrips(user.id);
+        setTrips(list);
+        // fetch expense sums per trip (small parallel batch)
+        const sums = {};
+        await Promise.all(list.map(async (t) => {
+          try {
+            const exps = await fetchExpenses(t.dbId);
+            sums[t.dbId] = exps.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+          } catch { sums[t.dbId] = 0; }
+        }));
+        setExpensesByTrip(sums);
+      } catch (err) {
+        console.error("Load trips failed:", err);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [user?.id]);
+
+  return (
+    <div style={{ minHeight: "100vh", background: T.bg, padding: "20px 20px 100px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
+        <button onClick={onBack} style={{ background: "none", border: "none", color: T.accent, fontSize: 15, fontWeight: 700, cursor: "pointer", padding: 0 }}>← Back</button>
+      </div>
+      <h1 style={{ fontSize: 28, fontWeight: 900, color: T.text, margin: "0 0 6px", letterSpacing: -0.5 }}>My Trips</h1>
+      <p style={{ color: T.textMid, fontSize: 14, margin: "0 0 20px" }}>Tap a trip to switch. Your data syncs across devices.</p>
+
+      <button onClick={onNewTrip} style={{ width: "100%", background: T.accent, color: T.bg, border: "none", borderRadius: 14, padding: 14, fontSize: 15, fontWeight: 900, cursor: "pointer", marginBottom: 20 }}>+ Start New Trip</button>
+
+      {loading && <div style={{ color: T.textDim, textAlign: "center", padding: 40 }}>Loading your trips...</div>}
+
+      {!loading && trips.length === 0 && (
+        <div style={{ color: T.textDim, textAlign: "center", padding: 40, fontSize: 14 }}>No trips yet. Start your first one above.</div>
+      )}
+
+      {!loading && trips.map(t => {
+        const spent = expensesByTrip[t.dbId] || 0;
+        const budget = parseFloat(t.budget) || 0;
+        const pct = budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : 0;
+        const cur = curByCode(t.currency);
+        const isActive = t.dbId === currentTripDbId;
+        return (
+          <button key={t.dbId} onClick={() => onSelectTrip(t)} style={{ width: "100%", background: T.card, border: `1px solid ${isActive ? T.accent : T.border}`, borderRadius: 16, padding: 16, marginBottom: 12, cursor: "pointer", textAlign: "left", display: "block" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+                  <span style={{ fontSize: 16, fontWeight: 900, color: T.text }}>{t.name}</span>
+                  {isActive && <span style={{ background: T.accent, color: T.bg, fontSize: 9, fontWeight: 900, padding: "2px 6px", borderRadius: 6, letterSpacing: 0.5 }}>ACTIVE</span>}
+                </div>
+                <div style={{ color: T.textMid, fontSize: 12 }}>{cur.flag} {t.isMultiLeg ? `${t.legs.length} legs` : t.destination}</div>
+                <div style={{ color: T.textDim, fontSize: 11, marginTop: 2 }}>{t.departureDate} → {t.returnDate}</div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ color: T.text, fontSize: 14, fontWeight: 900 }}>{cur.symbol}{spent.toFixed(0)}</div>
+                <div style={{ color: T.textDim, fontSize: 10 }}>of {cur.symbol}{budget.toFixed(0)}</div>
+              </div>
+            </div>
+            <div style={{ height: 4, background: T.bg, borderRadius: 99, overflow: "hidden", marginTop: 8 }}>
+              <div style={{ width: `${pct}%`, height: "100%", background: pct > 90 ? T.red : pct > 70 ? T.orange : T.green, transition: "width 0.3s" }} />
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstall, isInstalled, canInstall, isIOS, isMobile, onPaywall } = {}) {
   const [screen, setScreenRaw] = useState("welcome");
   const [trip, setTrip] = useState(null);
@@ -1163,6 +1239,23 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
       setSyncing(false);
     }
   };
+  const selectTrip = async (pickedTrip) => {
+    try {
+      setSyncing(true);
+      const exps = await fetchExpenses(pickedTrip.dbId);
+      setTrip(pickedTrip);
+      setTripDbId(pickedTrip.dbId);
+      setExpenses(exps);
+      setScreen("dashboard");
+      screenHistory.current = ["dashboard"];
+    } catch (err) {
+      console.error("selectTrip failed:", err);
+      alert("Couldn't load that trip. Check your connection.");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const duplicateExpense = (e) => { const d = { ...e, id: uid(), date: new Date().toISOString().slice(0, 10), status: "paid" }; addExpense(d); setSelectedExpense(d); };
   const handleEdit = (e) => { setEditExpense(e); setScreen("edit"); };
   const handleEditSave = (e) => { updateExpense(e); setEditExpense(null); setScreen("history"); };
@@ -1175,7 +1268,7 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
           <div style={{ display: "flex", gap: 4, alignItems: "center" }}><span style={{ fontSize: 18, fontWeight: 900, color: T.text }}>My</span><span style={{ fontSize: 18, fontWeight: 900, color: T.accent }}>Trip</span><span style={{ fontSize: 18, fontWeight: 900, color: T.text }}>Money</span></div>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             <span style={{ color: T.textMid, fontSize: 12 }}>{curByCode(trip.currency).flag} {trip.isMultiLeg ? `${trip.legs.length} legs` : trip.destination}</span>
-            <button onClick={() => { if (confirm("Switch to a new trip? Your current trip will be saved.")) { setScreen("create-trip"); } }} title="Switch Trip" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, padding: 0, color: T.textDim }}>🔄</button>
+            <button onClick={() => setScreen("trips-list")} title="My Trips" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, padding: 0, color: T.textDim }}>🔄</button>
             <button onClick={() => setScreen("settings")} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, padding: 0, color: T.textDim }}>⚙️</button>
           </div>
         </div>
@@ -1190,6 +1283,7 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
         {screen === "budget" && <BudgetScreen expenses={expenses} trip={trip} />}
         {screen === "reports" && <ReportsScreen expenses={expenses} trip={trip} setScreen={setScreen} />}
         {screen === "expense-detail" && <ExpenseDetailScreen expense={selectedExpense} trip={trip} setScreen={setScreen} onDelete={deleteExpense} onDuplicate={duplicateExpense} onEdit={handleEdit} />}
+        {screen === "trips-list" && <TripsListScreen user={user} currentTripDbId={tripDbId} onSelectTrip={selectTrip} onNewTrip={() => setScreen("create-trip")} onBack={() => setScreen(trip ? "dashboard" : "welcome")} />}
         {screen === "settings" && <SettingsScreen trip={trip} onUpdateTrip={setTrip} onClearData={() => { setExpenses([]); setScreen("dashboard"); }} onDeleteTrip={async () => { try { if (tripDbId) await dbDeleteTrip(tripDbId); } catch (err) { console.error("deleteTrip failed:", err); alert("Could not delete trip. Try again."); return; } setExpenses([]); setTrip(null); setTripDbId(null); setScreen("welcome"); screenHistory.current = ["welcome"]; }} onNewTrip={() => setScreen("create-trip")} onBack={() => setScreen("dashboard")} user={user} profile={profile} isPro={isPro} onSignOut={onSignOut} onInstall={onInstall} isInstalled={isInstalled} onPaywall={onPaywall} />}
         {screen === "email-report" && <EmailReportScreen trip={trip} expenses={expenses} onBack={() => setScreen("reports")} />}
       </div>
