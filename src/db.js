@@ -18,6 +18,7 @@ export async function fetchTrips(userId) {
     returnDate: t.return_date,
     budget: parseFloat(t.budget) || 0,
     currency: t.currency,
+    country: t.country || null,
     isMultiLeg: t.is_multi_leg,
     legs: t.legs || [],
     dbId: t.id,
@@ -35,6 +36,7 @@ export async function createTrip(userId, trip) {
       return_date: trip.returnDate,
       budget: trip.budget,
       currency: trip.currency,
+      country: trip.country || null,
       is_multi_leg: trip.isMultiLeg || false,
       legs: trip.legs || [],
     })
@@ -54,6 +56,7 @@ export async function updateTrip(tripId, trip) {
       return_date: trip.returnDate,
       budget: trip.budget,
       currency: trip.currency,
+      country: trip.country || null,
       is_multi_leg: trip.isMultiLeg || false,
       legs: trip.legs || [],
       updated_at: new Date().toISOString(),

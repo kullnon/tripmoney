@@ -28,6 +28,81 @@ const PAYMENT_METHODS = ["💳 Credit Card", "🏦 Debit Card", "💵 Cash", "�
 const PHASES = ["Pre-Trip", "During Trip", "Post-Trip"];
 const LEG_COLORS = ["#00D4FF", "#7B61FF", "#FF8A00", "#00E5A0", "#FFD600", "#FF4560", "#FF6B9D", "#B5E48C"];
 
+// ─── COUNTRIES ────────────────────────────────────────────────────
+const COUNTRIES = [
+  { code: "AG", name: "Antigua and Barbuda", flag: "🇦🇬" },
+  { code: "AR", name: "Argentina", flag: "🇦🇷" },
+  { code: "AU", name: "Australia", flag: "🇦🇺" },
+  { code: "BS", name: "Bahamas", flag: "🇧🇸" },
+  { code: "BB", name: "Barbados", flag: "🇧🇧" },
+  { code: "BE", name: "Belgium", flag: "🇧🇪" },
+  { code: "BZ", name: "Belize", flag: "🇧🇿" },
+  { code: "BR", name: "Brazil", flag: "🇧🇷" },
+  { code: "CA", name: "Canada", flag: "🇨🇦" },
+  { code: "CL", name: "Chile", flag: "🇨🇱" },
+  { code: "CN", name: "China", flag: "🇨🇳" },
+  { code: "CO", name: "Colombia", flag: "🇨🇴" },
+  { code: "CR", name: "Costa Rica", flag: "🇨🇷" },
+  { code: "CU", name: "Cuba", flag: "🇨🇺" },
+  { code: "CZ", name: "Czech Republic", flag: "🇨🇿" },
+  { code: "DK", name: "Denmark", flag: "🇩🇰" },
+  { code: "DM", name: "Dominica", flag: "🇩🇲" },
+  { code: "DO", name: "Dominican Republic", flag: "🇩🇴" },
+  { code: "EC", name: "Ecuador", flag: "🇪🇨" },
+  { code: "EG", name: "Egypt", flag: "🇪🇬" },
+  { code: "SV", name: "El Salvador", flag: "🇸🇻" },
+  { code: "FR", name: "France", flag: "🇫🇷" },
+  { code: "DE", name: "Germany", flag: "🇩🇪" },
+  { code: "GR", name: "Greece", flag: "🇬🇷" },
+  { code: "GD", name: "Grenada", flag: "🇬🇩" },
+  { code: "GT", name: "Guatemala", flag: "🇬🇹" },
+  { code: "HT", name: "Haiti", flag: "🇭🇹" },
+  { code: "HN", name: "Honduras", flag: "🇭🇳" },
+  { code: "IN", name: "India", flag: "🇮🇳" },
+  { code: "ID", name: "Indonesia", flag: "🇮🇩" },
+  { code: "IE", name: "Ireland", flag: "🇮🇪" },
+  { code: "IL", name: "Israel", flag: "🇮🇱" },
+  { code: "IT", name: "Italy", flag: "🇮🇹" },
+  { code: "JM", name: "Jamaica", flag: "🇯🇲" },
+  { code: "JP", name: "Japan", flag: "🇯🇵" },
+  { code: "KE", name: "Kenya", flag: "🇰🇪" },
+  { code: "MY", name: "Malaysia", flag: "🇲🇾" },
+  { code: "MX", name: "Mexico", flag: "🇲🇽" },
+  { code: "MA", name: "Morocco", flag: "🇲🇦" },
+  { code: "NL", name: "Netherlands", flag: "🇳🇱" },
+  { code: "NZ", name: "New Zealand", flag: "🇳🇿" },
+  { code: "NI", name: "Nicaragua", flag: "🇳🇮" },
+  { code: "NG", name: "Nigeria", flag: "🇳🇬" },
+  { code: "NO", name: "Norway", flag: "🇳🇴" },
+  { code: "PA", name: "Panama", flag: "🇵🇦" },
+  { code: "PE", name: "Peru", flag: "🇵🇪" },
+  { code: "PH", name: "Philippines", flag: "🇵🇭" },
+  { code: "PL", name: "Poland", flag: "🇵🇱" },
+  { code: "PT", name: "Portugal", flag: "🇵🇹" },
+  { code: "PR", name: "Puerto Rico", flag: "🇵🇷" },
+  { code: "RU", name: "Russia", flag: "🇷🇺" },
+  { code: "LC", name: "Saint Lucia", flag: "🇱🇨" },
+  { code: "SA", name: "Saudi Arabia", flag: "🇸🇦" },
+  { code: "SG", name: "Singapore", flag: "🇸🇬" },
+  { code: "ZA", name: "South Africa", flag: "🇿🇦" },
+  { code: "KR", name: "South Korea", flag: "🇰🇷" },
+  { code: "ES", name: "Spain", flag: "🇪🇸" },
+  { code: "KN", name: "St Kitts and Nevis", flag: "🇰🇳" },
+  { code: "VC", name: "St Vincent & Grenadines", flag: "🇻🇨" },
+  { code: "SE", name: "Sweden", flag: "🇸🇪" },
+  { code: "CH", name: "Switzerland", flag: "🇨🇭" },
+  { code: "TH", name: "Thailand", flag: "🇹🇭" },
+  { code: "TT", name: "Trinidad and Tobago", flag: "🇹🇹" },
+  { code: "TR", name: "Turkey", flag: "🇹🇷" },
+  { code: "AE", name: "UAE", flag: "🇦🇪" },
+  { code: "GB", name: "United Kingdom", flag: "🇬🇧" },
+  { code: "US", name: "United States", flag: "🇺🇸" },
+  { code: "UY", name: "Uruguay", flag: "🇺🇾" },
+  { code: "VN", name: "Vietnam", flag: "🇻🇳" },
+  { code: "OT", name: "Other", flag: "🌍" },
+];
+const countryByCode = (code) => COUNTRIES.find(c => c.code === code) || COUNTRIES[COUNTRIES.length - 1];
+
 // ─── CURRENCIES ───────────────────────────────────────────────────
 const CURRENCIES = [
   { code: "USD", symbol: "$", name: "US Dollar", flag: "🇺🇸" },
@@ -326,7 +401,19 @@ function EmailReportScreen({ trip, expenses, onBack }) {
 }
 
 // ─── WELCOME ──────────────────────────────────────────────────────
-function WelcomeScreen({ onStart, onCreateTrip, onInstall, isInstalled, canInstall, isIOS, isMobile }) {
+function WelcomeScreen({ onStart, onCreateTrip, onInstall, isInstalled, canInstall, isIOS, isMobile, isPro, onPaywall, user }) {
+  const [existingCount, setExistingCount] = useState(0);
+  useEffect(() => {
+    if (!user?.id) return;
+    (async () => {
+      try {
+        const list = await fetchTrips(user.id);
+        setExistingCount(list.length);
+      } catch {}
+    })();
+  }, [user?.id]);
+  const locked = !isPro && existingCount >= 1;
+  const handleCreate = () => locked ? onPaywall("Multiple Trips") : onCreateTrip();
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 24px", textAlign: "center" }}>
       <img src="/pwa-192x192.png" alt="" style={{ width: 72, height: 72, marginBottom: 16 }} onError={e => e.target.style.display = "none"} />
@@ -334,7 +421,7 @@ function WelcomeScreen({ onStart, onCreateTrip, onInstall, isInstalled, canInsta
       <div style={{ color: T.textMid, fontSize: 15, marginTop: 10, marginBottom: 32, lineHeight: 1.5, maxWidth: 260 }}>Track every dollar — from planning to landing.</div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%", maxWidth: 300 }}>
-        <button onClick={onCreateTrip} style={{ background: T.accent, color: T.bg, border: "none", borderRadius: 14, padding: 16, fontSize: 16, fontWeight: 800, cursor: "pointer" }}>Start New Trip →</button>
+        <button onClick={handleCreate} style={{ background: locked ? T.card : T.accent, color: locked ? T.textMid : T.bg, border: locked ? `1px solid ${T.border}` : "none", borderRadius: 14, padding: 16, fontSize: 16, fontWeight: 800, cursor: "pointer" }}>{locked ? "🔒 Start New Trip (Pro)" : "Start New Trip →"}</button>
         <button onClick={onStart} style={{ background: "transparent", color: T.textMid, border: `1px solid ${T.border}`, borderRadius: 14, padding: 14, fontSize: 14, cursor: "pointer" }}>Load Demo Trip</button>
       </div>
 
@@ -360,13 +447,13 @@ function WelcomeScreen({ onStart, onCreateTrip, onInstall, isInstalled, canInsta
 // ─── CREATE TRIP ──────────────────────────────────────────────────
 function CreateTripScreen({ onSave, onBack, isPro, onPaywall }) {
   const [tripType, setTripType] = useState(null); // null, "single", "multi"
-  const [form, setForm] = useState({ name: "", destination: "", departureDate: "", returnDate: "", budget: "2500", currency: "USD" });
-  const [legs, setLegs] = useState([{ id: 1, from: "", to: "", departureDate: "", returnDate: "", budget: "", currency: "USD" }]);
+  const [form, setForm] = useState({ name: "", destination: "", country: "", departureDate: "", returnDate: "", budget: "", currency: "USD" });
+  const [legs, setLegs] = useState([{ id: 1, from: "", to: "", country: "", departureDate: "", returnDate: "", budget: "", currency: "USD" }]);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const addLeg = () => {
     const lastLeg = legs[legs.length - 1];
-    setLegs(l => [...l, { id: uid(), from: lastLeg.to, to: "", departureDate: lastLeg.returnDate, returnDate: "", budget: "", currency: lastLeg.currency }]);
+    setLegs(l => [...l, { id: uid(), from: lastLeg.to, to: "", country: "", departureDate: lastLeg.returnDate, returnDate: "", budget: "", currency: lastLeg.currency }]);
   };
   const removeLeg = (id) => {
     setLegs(prev => {
@@ -416,24 +503,30 @@ function CreateTripScreen({ onSave, onBack, isPro, onPaywall }) {
   }
 
   if (tripType === "single") {
-    const ok = form.name && form.destination && form.departureDate && form.returnDate && form.budget;
+    const ok = form.name && form.destination && form.country && form.departureDate && form.returnDate && form.budget;
     return (
       <div style={{ minHeight: "100vh", padding: "40px 20px 60px" }}>
         <BackButton onClick={() => setTripType(null)} label="Back" />
         <div style={{ fontSize: 28, fontWeight: 900, color: T.text, marginBottom: 6 }}>📍 Single Trip</div>
         <div style={{ color: T.textMid, fontSize: 14, marginBottom: 30 }}>One destination, one budget.</div>
         <InputRow label="Trip Name"><input value={form.name} onChange={e => set("name", e.target.value)} placeholder="e.g. Puerto Rico 2025" style={inputStyle} /></InputRow>
-        <InputRow label="Destination"><input value={form.destination} onChange={e => set("destination", e.target.value)} placeholder="e.g. San Juan, Puerto Rico" style={inputStyle} /></InputRow>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <InputRow label="Destination"><input value={form.destination} onChange={e => set("destination", e.target.value)} placeholder="e.g. San Juan" style={inputStyle} /></InputRow>
+          <InputRow label="Country">
+            <select value={form.country} onChange={e => set("country", e.target.value)} style={{ ...inputStyle, appearance: "auto" }}>
+              <option value="">Select country...</option>
+              {COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.flag} {c.name}</option>)}
+            </select>
+          </InputRow>
           <InputRow label="Departure"><input type="date" value={form.departureDate} min={new Date().toISOString().slice(0,10)} onChange={e => { const v = e.target.value; set("departureDate", v); if (form.returnDate && v > form.returnDate) set("returnDate", v); }} style={inputStyle} /></InputRow>
           <InputRow label="Return"><input type="date" value={form.returnDate} min={form.departureDate || undefined} onChange={e => set("returnDate", e.target.value)} style={inputStyle} /></InputRow>
         </div>
         {totalDays > 0 && <div style={{ color: T.accent, fontSize: 13, fontWeight: 600, marginBottom: 14, marginTop: -6 }}>📅 {totalDays} day trip</div>}
         <CurrencyPicker value={form.currency} onChange={v => set("currency", v)} label="Trip Currency" />
         <InputRow label={`Budget (${form.currency})`}>
-          <div style={{ position: "relative" }}><span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: T.textMid, fontWeight: 700 }}>{curByCode(form.currency).symbol}</span><input value={form.budget} onChange={e => set("budget", e.target.value)} type="number" placeholder="2500" style={{ ...inputStyle, paddingLeft: 36 }} /></div>
+          <div style={{ position: "relative" }}><span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: T.textMid, fontWeight: 700 }}>{curByCode(form.currency).symbol}</span><input value={form.budget} onChange={e => set("budget", e.target.value)} type="number" placeholder="0.00" style={{ ...inputStyle, paddingLeft: 36 }} /></div>
         </InputRow>
-        <button disabled={!ok} onClick={() => onSave({ ...form, budget: parseFloat(form.budget) || 2500, isMultiLeg: false, legs: [{ id: 1, from: "Home", to: form.destination, departureDate: form.departureDate, returnDate: form.returnDate, budget: parseFloat(form.budget) || 2500, currency: form.currency }] })} style={{ width: "100%", background: ok ? T.accent : T.border, color: ok ? T.bg : T.textDim, border: "none", borderRadius: 14, padding: 16, fontSize: 17, fontWeight: 900, cursor: ok ? "pointer" : "not-allowed", marginTop: 10 }}>Start Tracking →</button>
+        <button disabled={!ok} onClick={() => onSave({ ...form, budget: parseFloat(form.budget) || 0, isMultiLeg: false, legs: [{ id: 1, from: "Home", to: form.destination, country: form.country, departureDate: form.departureDate, returnDate: form.returnDate, budget: parseFloat(form.budget) || 0, currency: form.currency }] })} style={{ width: "100%", background: ok ? T.accent : T.border, color: ok ? T.bg : T.textDim, border: "none", borderRadius: 14, padding: 16, fontSize: 17, fontWeight: 900, cursor: ok ? "pointer" : "not-allowed", marginTop: 10 }}>Start Tracking →</button>
       </div>
     );
   }
@@ -444,7 +537,7 @@ function CreateTripScreen({ onSave, onBack, isPro, onPaywall }) {
   const firstDate = allDates[0] || "";
   const lastDate = allDates[allDates.length - 1] || "";
   const multiName = form.name || (legs.length > 0 ? legs.map(l => l.to).filter(Boolean).join(" → ") : "My Trip");
-  const okMulti = form.name && legs.every(l => l.from && l.to && l.departureDate && l.returnDate && l.budget) && legs.length >= 2;
+  const okMulti = form.name && legs.every(l => l.from && l.to && l.country && l.departureDate && l.returnDate && l.budget) && legs.length >= 2;
 
   return (
     <div style={{ minHeight: "100vh", padding: "40px 20px 60px" }}>
@@ -472,6 +565,13 @@ function CreateTripScreen({ onSave, onBack, isPro, onPaywall }) {
             <div><div style={{ color: T.textDim, fontSize: 10, fontWeight: 600, marginBottom: 4 }}>TO</div><input value={leg.to} onChange={e => updateLeg(leg.id, "to", e.target.value)} placeholder="e.g. Cuba" style={{ ...inputStyle, padding: "10px 12px", fontSize: 13 }} /></div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+            <div style={{ gridColumn: "1 / -1", marginBottom: 4 }}>
+              <div style={{ color: T.textDim, fontSize: 10, fontWeight: 600, marginBottom: 4 }}>COUNTRY</div>
+              <select value={leg.country || ""} onChange={e => updateLeg(leg.id, "country", e.target.value)} style={{ ...inputStyle, padding: "10px 12px", fontSize: 13, appearance: "auto", width: "100%" }}>
+                <option value="">Select country...</option>
+                {COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.flag} {c.name}</option>)}
+              </select>
+            </div>
             <div><div style={{ color: T.textDim, fontSize: 10, fontWeight: 600, marginBottom: 4 }}>DEPART {lockedDepart && "🔒"}</div><input type="date" value={leg.departureDate} min={new Date().toISOString().slice(0,10)} onChange={e => { if (!lockedDepart) { const v = e.target.value; updateLeg(leg.id, "departureDate", v); if (leg.returnDate && v > leg.returnDate) updateLeg(leg.id, "returnDate", v); } }} readOnly={lockedDepart} style={{ ...inputStyle, padding: "10px 12px", fontSize: 13, opacity: lockedDepart ? 0.6 : 1, cursor: lockedDepart ? "not-allowed" : "text" }} /></div>
             <div><div style={{ color: T.textDim, fontSize: 10, fontWeight: 600, marginBottom: 4 }}>{i === legs.length - 1 && legs.length >= 2 ? "ARRIVE HOME" : "LEAVE TO"}</div><input type="date" value={leg.returnDate} min={leg.departureDate || undefined} onChange={e => updateLeg(leg.id, "returnDate", e.target.value)} style={{ ...inputStyle, padding: "10px 12px", fontSize: 13 }} /></div>
           </div>
@@ -581,7 +681,7 @@ function DashboardScreen({ expenses, trip, setScreen, setSelectedExpense }) {
           <div style={{ color: T.text, fontSize: 20, fontWeight: 900 }}>{headerName}</div>
           <div style={{ color: T.textMid, fontSize: 12 }}>{activeDep} → {activeRet} · {tripDays}d · {curByCode(tc).flag} {tc}</div>
         </div>
-        <div style={{ width: 36, height: 36, borderRadius: 10, background: gradeColor + "22", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 900, color: gradeColor, border: `2px solid ${gradeColor}44` }}>{grade}</div>
+        {expenses.length > 0 && <div title="Budget Health Grade" style={{ width: 36, height: 36, borderRadius: 10, background: gradeColor + "22", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 900, color: gradeColor, border: `2px solid ${gradeColor}44` }}>{grade}</div>}
       </div>
 
       <LegSelector trip={trip} activeLegId={activeLeg} onChange={setActiveLeg} />
@@ -1037,7 +1137,7 @@ function SettingsScreen({ trip, onUpdateTrip, onClearData, onDeleteTrip, onNewTr
 // ─── APP ──────────────────────────────────────────────────────────
 const NAV = [{ id: "dashboard", icon: "🏠", label: "Home" }, { id: "history", icon: "📋", label: "History" }, { id: "budget", icon: "💰", label: "Budget" }, { id: "reports", icon: "📊", label: "Reports" }];
 
-function TripsListScreen({ user, currentTripDbId, onSelectTrip, onNewTrip, onBack }) {
+function TripsListScreen({ user, currentTripDbId, onSelectTrip, onNewTrip, onBack, isPro, onPaywall }) {
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expensesByTrip, setExpensesByTrip] = useState({});
@@ -1071,9 +1171,17 @@ function TripsListScreen({ user, currentTripDbId, onSelectTrip, onNewTrip, onBac
         <button onClick={onBack} style={{ background: "none", border: "none", color: T.accent, fontSize: 15, fontWeight: 700, cursor: "pointer", padding: 0 }}>← Back</button>
       </div>
       <h1 style={{ fontSize: 28, fontWeight: 900, color: T.text, margin: "0 0 6px", letterSpacing: -0.5 }}>My Trips</h1>
-      <p style={{ color: T.textMid, fontSize: 14, margin: "0 0 20px" }}>Tap a trip to switch. Your data syncs across devices.</p>
+      <p style={{ color: T.textMid, fontSize: 14, margin: "0 0 6px" }}>Tap a trip to switch. Your data syncs across devices.</p>
+      <p style={{ color: T.textDim, fontSize: 12, margin: "0 0 18px" }}>{isPro ? "Pro plan · Unlimited trips" : `Free plan · ${trips.length}/1 trips used · `}{!isPro && <span style={{ color: T.accent, fontWeight: 700 }}>Upgrade for unlimited</span>}</p>
 
-      <button onClick={onNewTrip} style={{ width: "100%", background: T.accent, color: T.bg, border: "none", borderRadius: 14, padding: 14, fontSize: 15, fontWeight: 900, cursor: "pointer", marginBottom: 20 }}>+ Start New Trip</button>
+      {(() => {
+        const locked = !isPro && trips.length >= 1;
+        return (
+          <button onClick={() => locked ? onPaywall("Multiple Trips") : onNewTrip()} style={{ width: "100%", background: locked ? T.card : T.accent, color: locked ? T.textMid : T.bg, border: locked ? `1px solid ${T.border}` : "none", borderRadius: 14, padding: 14, fontSize: 15, fontWeight: 900, cursor: "pointer", marginBottom: 20 }}>
+            {locked ? "🔒 Start New Trip (Pro)" : "+ Start New Trip"}
+          </button>
+        );
+      })()}
 
       {loading && <div style={{ color: T.textDim, textAlign: "center", padding: 40 }}>Loading your trips...</div>}
 
@@ -1095,7 +1203,7 @@ function TripsListScreen({ user, currentTripDbId, onSelectTrip, onNewTrip, onBac
                   <span style={{ fontSize: 16, fontWeight: 900, color: T.text }}>{t.name}</span>
                   {isActive && <span style={{ background: T.accent, color: T.bg, fontSize: 9, fontWeight: 900, padding: "2px 6px", borderRadius: 6, letterSpacing: 0.5 }}>ACTIVE</span>}
                 </div>
-                <div style={{ color: T.textMid, fontSize: 12 }}>{cur.flag} {t.isMultiLeg ? `${t.legs.length} legs` : t.destination}</div>
+                <div style={{ color: T.textMid, fontSize: 12 }}>{(t.country ? countryByCode(t.country).flag : cur.flag)} {t.isMultiLeg ? `${t.legs.length} legs` : t.destination}</div>
                 <div style={{ color: T.textDim, fontSize: 11, marginTop: 2 }}>{t.departureDate} → {t.returnDate}</div>
               </div>
               <div style={{ textAlign: "right" }}>
@@ -1267,14 +1375,14 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
         <div style={{ position: "sticky", top: 0, zIndex: 50, background: T.bg + "EE", backdropFilter: "blur(12px)", borderBottom: `1px solid ${T.border}`, padding: "10px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ display: "flex", gap: 4, alignItems: "center" }}><span style={{ fontSize: 18, fontWeight: 900, color: T.text }}>My</span><span style={{ fontSize: 18, fontWeight: 900, color: T.accent }}>Trip</span><span style={{ fontSize: 18, fontWeight: 900, color: T.text }}>Money</span></div>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <span style={{ color: T.textMid, fontSize: 12 }}>{curByCode(trip.currency).flag} {trip.isMultiLeg ? `${trip.legs.length} legs` : trip.destination}</span>
+            <span style={{ color: T.textMid, fontSize: 12 }}>{(trip.country ? countryByCode(trip.country).flag : curByCode(trip.currency).flag)} {trip.isMultiLeg ? `${trip.legs.length} legs` : trip.destination}</span>
             <button onClick={() => setScreen("trips-list")} title="My Trips" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, padding: 0, color: T.textDim }}>🔄</button>
             <button onClick={() => setScreen("settings")} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, padding: 0, color: T.textDim }}>⚙️</button>
           </div>
         </div>
       )}
       <div>
-        {screen === "welcome" && <WelcomeScreen onStart={() => { setTrip(DEFAULT_TRIP); setExpenses(SEED_EXPENSES); setScreen("dashboard"); }} onCreateTrip={() => setScreen("create-trip")} onInstall={onInstall} isInstalled={isInstalled} canInstall={canInstall} isIOS={isIOS} isMobile={isMobile} />}
+        {screen === "welcome" && <WelcomeScreen onStart={() => { setTrip(DEFAULT_TRIP); setExpenses(SEED_EXPENSES); setScreen("dashboard"); }} onCreateTrip={() => setScreen("create-trip")} onInstall={onInstall} isInstalled={isInstalled} canInstall={canInstall} isIOS={isIOS} isMobile={isMobile} isPro={isPro} onPaywall={onPaywall} user={user} />}
         {screen === "create-trip" && <CreateTripScreen onSave={t => { setTrip(t); setExpenses([]); setScreen("dashboard"); }} onBack={trip && trip.name && expenses.length >= 0 ? () => setScreen("dashboard") : null} isPro={isPro} onPaywall={onPaywall} />}
         {screen === "dashboard" && <DashboardScreen expenses={expenses} trip={trip} setScreen={setScreen} setSelectedExpense={setSelectedExpense} />}
         {screen === "history" && <HistoryScreen expenses={expenses} trip={trip} setScreen={setScreen} setSelectedExpense={setSelectedExpense} />}
@@ -1283,7 +1391,7 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
         {screen === "budget" && <BudgetScreen expenses={expenses} trip={trip} />}
         {screen === "reports" && <ReportsScreen expenses={expenses} trip={trip} setScreen={setScreen} />}
         {screen === "expense-detail" && <ExpenseDetailScreen expense={selectedExpense} trip={trip} setScreen={setScreen} onDelete={deleteExpense} onDuplicate={duplicateExpense} onEdit={handleEdit} />}
-        {screen === "trips-list" && <TripsListScreen user={user} currentTripDbId={tripDbId} onSelectTrip={selectTrip} onNewTrip={() => setScreen("create-trip")} onBack={() => setScreen(trip ? "dashboard" : "welcome")} />}
+        {screen === "trips-list" && <TripsListScreen user={user} currentTripDbId={tripDbId} onSelectTrip={selectTrip} onNewTrip={() => setScreen("create-trip")} onBack={() => setScreen(trip ? "dashboard" : "welcome")} isPro={isPro} onPaywall={onPaywall} />}
         {screen === "settings" && <SettingsScreen trip={trip} onUpdateTrip={setTrip} onClearData={() => { setExpenses([]); setScreen("dashboard"); }} onDeleteTrip={async () => { try { if (tripDbId) await dbDeleteTrip(tripDbId); } catch (err) { console.error("deleteTrip failed:", err); alert("Could not delete trip. Try again."); return; } setExpenses([]); setTrip(null); setTripDbId(null); setScreen("welcome"); screenHistory.current = ["welcome"]; }} onNewTrip={() => setScreen("create-trip")} onBack={() => setScreen("dashboard")} user={user} profile={profile} isPro={isPro} onSignOut={onSignOut} onInstall={onInstall} isInstalled={isInstalled} onPaywall={onPaywall} />}
         {screen === "email-report" && <EmailReportScreen trip={trip} expenses={expenses} onBack={() => setScreen("reports")} />}
       </div>
