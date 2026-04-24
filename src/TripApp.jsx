@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { fetchTrips, createTrip, updateTrip, deleteTrip, fetchExpenses, createExpense, updateExpense, deleteExpense } from "./db";
 
 // ─── DESIGN TOKENS ────────────────────────────────────────────────
 const T = {
