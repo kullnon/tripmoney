@@ -425,7 +425,7 @@ function CreateTripScreen({ onSave, onBack, isPro, onPaywall }) {
         <InputRow label="Trip Name"><input value={form.name} onChange={e => set("name", e.target.value)} placeholder="e.g. Puerto Rico 2025" style={inputStyle} /></InputRow>
         <InputRow label="Destination"><input value={form.destination} onChange={e => set("destination", e.target.value)} placeholder="e.g. San Juan, Puerto Rico" style={inputStyle} /></InputRow>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <InputRow label="Departure"><input type="date" value={form.departureDate} onChange={e => { const v = e.target.value; set("departureDate", v); if (form.returnDate && v > form.returnDate) set("returnDate", v); }} style={inputStyle} /></InputRow>
+          <InputRow label="Departure"><input type="date" value={form.departureDate} min={new Date().toISOString().slice(0,10)} onChange={e => { const v = e.target.value; set("departureDate", v); if (form.returnDate && v > form.returnDate) set("returnDate", v); }} style={inputStyle} /></InputRow>
           <InputRow label="Return"><input type="date" value={form.returnDate} min={form.departureDate || undefined} onChange={e => set("returnDate", e.target.value)} style={inputStyle} /></InputRow>
         </div>
         {totalDays > 0 && <div style={{ color: T.accent, fontSize: 13, fontWeight: 600, marginBottom: 14, marginTop: -6 }}>📅 {totalDays} day trip</div>}
@@ -472,7 +472,7 @@ function CreateTripScreen({ onSave, onBack, isPro, onPaywall }) {
             <div><div style={{ color: T.textDim, fontSize: 10, fontWeight: 600, marginBottom: 4 }}>TO</div><input value={leg.to} onChange={e => updateLeg(leg.id, "to", e.target.value)} placeholder="e.g. Cuba" style={{ ...inputStyle, padding: "10px 12px", fontSize: 13 }} /></div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
-            <div><div style={{ color: T.textDim, fontSize: 10, fontWeight: 600, marginBottom: 4 }}>DEPART {lockedDepart && "🔒"}</div><input type="date" value={leg.departureDate} onChange={e => { if (!lockedDepart) { const v = e.target.value; updateLeg(leg.id, "departureDate", v); if (leg.returnDate && v > leg.returnDate) updateLeg(leg.id, "returnDate", v); } }} readOnly={lockedDepart} style={{ ...inputStyle, padding: "10px 12px", fontSize: 13, opacity: lockedDepart ? 0.6 : 1, cursor: lockedDepart ? "not-allowed" : "text" }} /></div>
+            <div><div style={{ color: T.textDim, fontSize: 10, fontWeight: 600, marginBottom: 4 }}>DEPART {lockedDepart && "🔒"}</div><input type="date" value={leg.departureDate} min={new Date().toISOString().slice(0,10)} onChange={e => { if (!lockedDepart) { const v = e.target.value; updateLeg(leg.id, "departureDate", v); if (leg.returnDate && v > leg.returnDate) updateLeg(leg.id, "returnDate", v); } }} readOnly={lockedDepart} style={{ ...inputStyle, padding: "10px 12px", fontSize: 13, opacity: lockedDepart ? 0.6 : 1, cursor: lockedDepart ? "not-allowed" : "text" }} /></div>
             <div><div style={{ color: T.textDim, fontSize: 10, fontWeight: 600, marginBottom: 4 }}>{i === legs.length - 1 && legs.length >= 2 ? "ARRIVE HOME" : "LEAVE TO"}</div><input type="date" value={leg.returnDate} min={leg.departureDate || undefined} onChange={e => updateLeg(leg.id, "returnDate", e.target.value)} style={{ ...inputStyle, padding: "10px 12px", fontSize: 13 }} /></div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -1039,8 +1039,8 @@ const NAV = [{ id: "dashboard", icon: "🏠", label: "Home" }, { id: "history", 
 
 export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstall, isInstalled, canInstall, isIOS, isMobile, onPaywall } = {}) {
   const [screen, setScreenRaw] = useState("welcome");
-  const [trip, setTrip] = useState(DEFAULT_TRIP);
-  const [expenses, setExpenses] = useState(SEED_EXPENSES);
+  const [trip, setTrip] = useState(null);
+  const [expenses, setExpenses] = useState([]);
   const [selectedExpense, setSelectedExpense] = useState(null);
   const [editExpense, setEditExpense] = useState(null);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
@@ -1088,6 +1088,9 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
           setExpenses(exps);
           setScreenRaw("dashboard");
           screenHistory.current = ["dashboard"];
+        } else {
+          setScreenRaw("welcome");
+          screenHistory.current = ["welcome"];
         }
       } catch (err) {
         console.error("Load failed:", err);
@@ -1187,7 +1190,7 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
         {screen === "budget" && <BudgetScreen expenses={expenses} trip={trip} />}
         {screen === "reports" && <ReportsScreen expenses={expenses} trip={trip} setScreen={setScreen} />}
         {screen === "expense-detail" && <ExpenseDetailScreen expense={selectedExpense} trip={trip} setScreen={setScreen} onDelete={deleteExpense} onDuplicate={duplicateExpense} onEdit={handleEdit} />}
-        {screen === "settings" && <SettingsScreen trip={trip} onUpdateTrip={setTrip} onClearData={() => { setExpenses([]); setScreen("dashboard"); }} onDeleteTrip={async () => { try { if (tripDbId) await dbDeleteTrip(tripDbId); } catch (err) { console.error("deleteTrip failed:", err); alert("Could not delete trip. Try again."); return; } setExpenses([]); setTrip(DEFAULT_TRIP); setTripDbId(null); setScreen("welcome"); screenHistory.current = ["welcome"]; }} onNewTrip={() => setScreen("create-trip")} onBack={() => setScreen("dashboard")} user={user} profile={profile} isPro={isPro} onSignOut={onSignOut} onInstall={onInstall} isInstalled={isInstalled} onPaywall={onPaywall} />}
+        {screen === "settings" && <SettingsScreen trip={trip} onUpdateTrip={setTrip} onClearData={() => { setExpenses([]); setScreen("dashboard"); }} onDeleteTrip={async () => { try { if (tripDbId) await dbDeleteTrip(tripDbId); } catch (err) { console.error("deleteTrip failed:", err); alert("Could not delete trip. Try again."); return; } setExpenses([]); setTrip(null); setTripDbId(null); setScreen("welcome"); screenHistory.current = ["welcome"]; }} onNewTrip={() => setScreen("create-trip")} onBack={() => setScreen("dashboard")} user={user} profile={profile} isPro={isPro} onSignOut={onSignOut} onInstall={onInstall} isInstalled={isInstalled} onPaywall={onPaywall} />}
         {screen === "email-report" && <EmailReportScreen trip={trip} expenses={expenses} onBack={() => setScreen("reports")} />}
       </div>
       {showQuickAdd && <QuickAddSheet onSave={addExpense} onFullForm={() => { setShowQuickAdd(false); setScreen("add"); }} onClose={() => setShowQuickAdd(false)} trip={trip} />}
