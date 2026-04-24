@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { fetchTrips, createTrip, updateTrip, deleteTrip, fetchExpenses, createExpense, updateExpense, deleteExpense } from "./db";
+import { fetchTrips, createTrip, updateTrip, deleteTrip as dbDeleteTrip, fetchExpenses, createExpense as dbCreateExpense, updateExpense as dbUpdateExpense, deleteExpense as dbDeleteExpense } from "./db";
 
 // ─── DESIGN TOKENS ────────────────────────────────────────────────
 const T = {
@@ -143,10 +143,7 @@ function autoLeg(date, legs) {
   return legs[legs.length - 1].id;
 }
 
-function loadDataSync(k, fb) { try { const r = localStorage.getItem(k); return r ? JSON.parse(r) : fb; } catch { return fb; } }
-function saveDataSync(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
-async function loadData(k, fb) { return loadDataSync(k, fb); }
-async function saveData(k, v) { saveDataSync(k, v); }
+// localStorage helpers removed - using Supabase via db.js
 
 // ─── REUSABLE COMPONENTS ─────────────────────────────────────────
 function PhaseTag({ phase }) { const c = PHASE_COLORS[phase] || T.textDim; return <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, color: c, background: c + "22", borderRadius: 4, padding: "2px 7px", textTransform: "uppercase" }}>{phase}</span>; }
@@ -1071,33 +1068,98 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
     return () => window.removeEventListener("popstate", handlePop);
   }, [showQuickAdd]);
 
-  // Load persisted data
+  // CLOUD SYNC: Load trip + expenses from Supabase
+  const [tripDbId, setTripDbId] = useState(null);
+  const [syncing, setSyncing] = useState(false);
+
   useEffect(() => {
-    const t = loadDataSync("tm-trip", null);
-    const e = loadDataSync("tm-expenses", null);
-    const s = loadDataSync("tm-screen", null);
-    if (t) setTrip(t);
-    if (e) setExpenses(e);
-    if (s && s !== "welcome" && ["dashboard", "history", "budget", "reports"].includes(s)) {
-      setScreenRaw(s);
-      screenHistory.current = [s];
+    if (!user?.id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const trips = await fetchTrips(user.id);
+        if (cancelled) return;
+        if (trips.length > 0) {
+          const latest = trips[0];
+          setTrip(latest);
+          setTripDbId(latest.dbId);
+          const exps = await fetchExpenses(latest.dbId);
+          if (cancelled) return;
+          setExpenses(exps);
+          setScreenRaw("dashboard");
+          screenHistory.current = ["dashboard"];
+        }
+      } catch (err) {
+        console.error("Load failed:", err);
+        alert("Couldn't load your trips. Check your connection and refresh.");
+      } finally {
+        if (!cancelled) setLoaded(true);
+        window.history.replaceState({}, "");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
+  // CLOUD SYNC: Save trip changes (debounced)
+  useEffect(() => {
+    if (!loaded || !user?.id) return;
+    if (!trip || !trip.name) return;
+    const timer = setTimeout(async () => {
+      try {
+        setSyncing(true);
+        if (!tripDbId) {
+          const created = await createTrip(user.id, trip);
+          setTripDbId(created.dbId);
+        } else {
+          await updateTrip(tripDbId, trip);
+        }
+      } catch (err) {
+        console.error("Sync failed:", err);
+      } finally {
+        setSyncing(false);
+      }
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [trip, loaded, user?.id, tripDbId]);
+
+  const addExpense = async (e) => {
+    setExpenses(p => [...p, e]);
+    if (!user?.id || !tripDbId) return;
+    try {
+      setSyncing(true);
+      const saved = await dbCreateExpense(user.id, tripDbId, e);
+      setExpenses(p => p.map(x => x.id === e.id ? { ...x, id: saved.id, dbId: saved.id } : x));
+    } catch (err) {
+      console.error("addExpense failed:", err);
+      alert("Couldn't save expense. Check your connection.");
+    } finally {
+      setSyncing(false);
     }
-    setLoaded(true);
-    // Push initial history state
-    window.history.replaceState({}, "");
-  }, []);
-
-  // Save on change
-  useEffect(() => {
-    if (!loaded) return;
-    saveDataSync("tm-trip", trip);
-    saveDataSync("tm-expenses", expenses);
-    if (["dashboard", "history", "budget", "reports"].includes(screen)) saveDataSync("tm-screen", screen);
-  }, [trip, expenses, screen, loaded]);
-
-  const addExpense = (e) => setExpenses(p => [...p, e]);
-  const updateExpense = (e) => setExpenses(p => p.map(x => x.id === e.id ? e : x));
-  const deleteExpense = (id) => setExpenses(p => p.filter(x => x.id !== id));
+  };
+  const updateExpense = async (e) => {
+    setExpenses(p => p.map(x => x.id === e.id ? e : x));
+    if (!user?.id || !e.id) return;
+    try {
+      setSyncing(true);
+      await dbUpdateExpense(e.id, e);
+    } catch (err) {
+      console.error("updateExpense failed:", err);
+    } finally {
+      setSyncing(false);
+    }
+  };
+  const deleteExpense = async (id) => {
+    setExpenses(p => p.filter(x => x.id !== id));
+    if (!user?.id || !id) return;
+    try {
+      setSyncing(true);
+      await dbDeleteExpense(id);
+    } catch (err) {
+      console.error("deleteExpense failed:", err);
+    } finally {
+      setSyncing(false);
+    }
+  };
   const duplicateExpense = (e) => { const d = { ...e, id: uid(), date: new Date().toISOString().slice(0, 10), status: "paid" }; addExpense(d); setSelectedExpense(d); };
   const handleEdit = (e) => { setEditExpense(e); setScreen("edit"); };
   const handleEditSave = (e) => { updateExpense(e); setEditExpense(null); setScreen("history"); };
@@ -1125,7 +1187,7 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
         {screen === "budget" && <BudgetScreen expenses={expenses} trip={trip} />}
         {screen === "reports" && <ReportsScreen expenses={expenses} trip={trip} setScreen={setScreen} />}
         {screen === "expense-detail" && <ExpenseDetailScreen expense={selectedExpense} trip={trip} setScreen={setScreen} onDelete={deleteExpense} onDuplicate={duplicateExpense} onEdit={handleEdit} />}
-        {screen === "settings" && <SettingsScreen trip={trip} onUpdateTrip={setTrip} onClearData={() => { setExpenses([]); setScreen("dashboard"); }} onDeleteTrip={() => { setExpenses([]); setTrip(DEFAULT_TRIP); localStorage.removeItem("tm-trip"); localStorage.removeItem("tm-expenses"); localStorage.removeItem("tm-screen"); setScreen("welcome"); screenHistory.current = ["welcome"]; }} onNewTrip={() => setScreen("create-trip")} onBack={() => setScreen("dashboard")} user={user} profile={profile} isPro={isPro} onSignOut={onSignOut} onInstall={onInstall} isInstalled={isInstalled} onPaywall={onPaywall} />}
+        {screen === "settings" && <SettingsScreen trip={trip} onUpdateTrip={setTrip} onClearData={() => { setExpenses([]); setScreen("dashboard"); }} onDeleteTrip={async () => { try { if (tripDbId) await dbDeleteTrip(tripDbId); } catch (err) { console.error("deleteTrip failed:", err); alert("Could not delete trip. Try again."); return; } setExpenses([]); setTrip(DEFAULT_TRIP); setTripDbId(null); setScreen("welcome"); screenHistory.current = ["welcome"]; }} onNewTrip={() => setScreen("create-trip")} onBack={() => setScreen("dashboard")} user={user} profile={profile} isPro={isPro} onSignOut={onSignOut} onInstall={onInstall} isInstalled={isInstalled} onPaywall={onPaywall} />}
         {screen === "email-report" && <EmailReportScreen trip={trip} expenses={expenses} onBack={() => setScreen("reports")} />}
       </div>
       {showQuickAdd && <QuickAddSheet onSave={addExpense} onFullForm={() => { setShowQuickAdd(false); setScreen("add"); }} onClose={() => setShowQuickAdd(false)} trip={trip} />}
