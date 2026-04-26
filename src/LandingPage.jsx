@@ -90,7 +90,10 @@ export default function LandingPage({ onGetStarted, onLogin, onInstall, canInsta
         .fade-up-4 { animation-delay: 0.4s; }
         .cta-btn { transition: all 0.2s; }
         .cta-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 40px ${T.accent}44; }
-      `}</style>
+      
+.nav-pricing { display: inline; }
+@media (max-width: 600px) { .nav-pricing { display: none !important; } }
+`}</style>
 
       {/* ─── NAV ─── */}
       <nav style={{
@@ -109,7 +112,7 @@ export default function LandingPage({ onGetStarted, onLogin, onInstall, canInsta
             </span>
           </div>
           <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-            <a href="#pricing" style={{ color: T.textMid, textDecoration: "none", fontSize: 14, fontWeight: 600 }}>Pricing</a>
+            <a href="#pricing" className="nav-pricing" style={{ color: T.textMid, textDecoration: "none", fontSize: 14, fontWeight: 600 }}>Pricing</a>
             <button onClick={() => onGetStarted && onGetStarted()} style={{ background: T.accent, color: T.bg, border: "none", borderRadius: 10, padding: "10px 20px", fontSize: 14, fontWeight: 800, cursor: "pointer" }} className="cta-btn">Get Started</button>
           </div>
         </Section>
