@@ -52,6 +52,19 @@ export default function App() {
     if (user) setView("app");
   }, [user, loading]);
 
+  // PWA install nudge: fires once per session, only on mobile, only when user just signed in and app isn't installed
+  useEffect(() => {
+    if (loading || !user || isInstalled) return;
+    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (!isMobile) return;
+    if (sessionStorage.getItem("tm-install-nudged")) return;
+    const timer = setTimeout(() => {
+      setShowInstallModal(true);
+      sessionStorage.setItem("tm-install-nudged", "1");
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [user, loading, isInstalled]);
+
   if (loading || !minLoadDone) return <LoadingScreen />;
 
   const renderView = () => {
