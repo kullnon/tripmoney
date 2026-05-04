@@ -1,5 +1,69 @@
 import { supabase } from '../supabase';
 
+// ─── Country display helpers ──────────────────────────────────────────────────
+const COUNTRY_NAMES = {
+  US: { name: 'United States',   flag: '🇺🇸' },
+  GB: { name: 'United Kingdom',  flag: '🇬🇧' },
+  FR: { name: 'France',          flag: '🇫🇷' },
+  DE: { name: 'Germany',         flag: '🇩🇪' },
+  IT: { name: 'Italy',           flag: '🇮🇹' },
+  ES: { name: 'Spain',           flag: '🇪🇸' },
+  JP: { name: 'Japan',           flag: '🇯🇵' },
+  MX: { name: 'Mexico',          flag: '🇲🇽' },
+  CA: { name: 'Canada',          flag: '🇨🇦' },
+  AU: { name: 'Australia',       flag: '🇦🇺' },
+  TR: { name: 'Turkey',          flag: '🇹🇷' },
+  GR: { name: 'Greece',          flag: '🇬🇷' },
+  TH: { name: 'Thailand',        flag: '🇹🇭' },
+  PT: { name: 'Portugal',        flag: '🇵🇹' },
+  NL: { name: 'Netherlands',     flag: '🇳🇱' },
+  CH: { name: 'Switzerland',     flag: '🇨🇭' },
+  AT: { name: 'Austria',         flag: '🇦🇹' },
+  BE: { name: 'Belgium',         flag: '🇧🇪' },
+  PL: { name: 'Poland',          flag: '🇵🇱' },
+  CZ: { name: 'Czech Republic',  flag: '🇨🇿' },
+  HR: { name: 'Croatia',         flag: '🇭🇷' },
+  HU: { name: 'Hungary',         flag: '🇭🇺' },
+  RO: { name: 'Romania',         flag: '🇷🇴' },
+  RU: { name: 'Russia',          flag: '🇷🇺' },
+  CN: { name: 'China',           flag: '🇨🇳' },
+  IN: { name: 'India',           flag: '🇮🇳' },
+  BR: { name: 'Brazil',          flag: '🇧🇷' },
+  AR: { name: 'Argentina',       flag: '🇦🇷' },
+  CL: { name: 'Chile',           flag: '🇨🇱' },
+  CO: { name: 'Colombia',        flag: '🇨🇴' },
+  PE: { name: 'Peru',            flag: '🇵🇪' },
+  SG: { name: 'Singapore',       flag: '🇸🇬' },
+  MY: { name: 'Malaysia',        flag: '🇲🇾' },
+  ID: { name: 'Indonesia',       flag: '🇮🇩' },
+  KR: { name: 'South Korea',     flag: '🇰🇷' },
+  VN: { name: 'Vietnam',         flag: '🇻🇳' },
+  PH: { name: 'Philippines',     flag: '🇵🇭' },
+  TW: { name: 'Taiwan',          flag: '🇹🇼' },
+  AE: { name: 'UAE',             flag: '🇦🇪' },
+  SA: { name: 'Saudi Arabia',    flag: '🇸🇦' },
+  MA: { name: 'Morocco',         flag: '🇲🇦' },
+  EG: { name: 'Egypt',           flag: '🇪🇬' },
+  ZA: { name: 'South Africa',    flag: '🇿🇦' },
+  NG: { name: 'Nigeria',         flag: '🇳🇬' },
+  NZ: { name: 'New Zealand',     flag: '🇳🇿' },
+  SE: { name: 'Sweden',          flag: '🇸🇪' },
+  NO: { name: 'Norway',          flag: '🇳🇴' },
+  DK: { name: 'Denmark',         flag: '🇩🇰' },
+  FI: { name: 'Finland',         flag: '🇫🇮' },
+  IE: { name: 'Ireland',         flag: '🇮🇪' },
+  IL: { name: 'Israel',          flag: '🇮🇱' },
+  HK: { name: 'Hong Kong',       flag: '🇭🇰' },
+  MO: { name: 'Macau',           flag: '🇲🇴' },
+};
+
+export function countryDisplay(code) {
+  if (!code) return { flag: '🌍', name: 'Unknown' };
+  const info = COUNTRY_NAMES[code.toUpperCase()];
+  return info || { flag: '', name: code };
+}
+
+// ─── Date helper ─────────────────────────────────────────────────────────────
 function sinceDate(dateRange) {
   if (dateRange === 'all') return null;
   const d = new Date();
@@ -7,6 +71,37 @@ function sinceDate(dateRange) {
   const days = { '7d': 7, '30d': 30, '90d': 90 };
   d.setDate(d.getDate() - (days[dateRange] || 30));
   return d.toISOString();
+}
+
+export async function getVisitorCount(dateRange) {
+  const since = sinceDate(dateRange);
+  let q = supabase.from('page_views').select('visitor_id');
+  if (since) q = q.gte('created_at', since);
+  const { data } = await q;
+  return new Set((data || []).map(r => r.visitor_id)).size;
+}
+
+export async function getPageViewsCount(dateRange) {
+  const since = sinceDate(dateRange);
+  let q = supabase.from('page_views').select('*', { count: 'exact', head: true });
+  if (since) q = q.gte('created_at', since);
+  const { count } = await q;
+  return count || 0;
+}
+
+export async function getTopReferrers(dateRange, limit = 5) {
+  const since = sinceDate(dateRange);
+  let q = supabase.from('page_views').select('referrer').not('referrer', 'is', null);
+  if (since) q = q.gte('created_at', since);
+  const { data } = await q;
+  const counts = {};
+  (data || []).forEach(r => {
+    if (r.referrer) counts[r.referrer] = (counts[r.referrer] || 0) + 1;
+  });
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([referrer, count]) => ({ referrer, count }));
 }
 
 export async function getKpis(dateRange) {
@@ -23,11 +118,14 @@ export async function getKpis(dateRange) {
   const { count: proSubscribers } = await supabase
     .from('profiles').select('*', { count: 'exact', head: true }).eq('plan', 'pro');
 
+  const visitors = await getVisitorCount(dateRange);
+
   return {
     signups: signups || 0,
     activeTrips: activeTrips || 0,
     proSubscribers: proSubscribers || 0,
     estimatedMrr: (proSubscribers || 0) * 9.99,
+    visitors,
   };
 }
 

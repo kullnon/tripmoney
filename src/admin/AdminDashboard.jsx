@@ -3,7 +3,7 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
 } from 'recharts';
-import { getKpis, getSignupsOverTime, getPlanBreakdown, getRecentSignups, getTopCountries } from './adminQueries';
+import { getKpis, getSignupsOverTime, getPlanBreakdown, getRecentSignups, getTopCountries, getTopReferrers, countryDisplay } from './adminQueries';
 
 const T = {
   bg: "#0A0F1E", surface: "#111827", card: "#1A2235", cardHover: "#1F2A40",
@@ -68,6 +68,7 @@ export default function AdminDashboard() {
   const [planBreakdown, setPlanBreakdown] = useState({ free: 0, pro: 0 });
   const [recentSignups, setRecentSignups] = useState([]);
   const [topCountries, setTopCountries] = useState([]);
+  const [topReferrers, setTopReferrers] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -78,12 +79,14 @@ export default function AdminDashboard() {
       getPlanBreakdown(),
       getRecentSignups(10),
       getTopCountries(5),
-    ]).then(([k, sc, pb, rs, tc]) => {
+      getTopReferrers(dateRange, 5),
+    ]).then(([k, sc, pb, rs, tc, tr]) => {
       setKpis(k);
       setSignupsChart(sc);
       setPlanBreakdown(pb);
       setRecentSignups(rs);
       setTopCountries(tc);
+      setTopReferrers(tr);
       setLoading(false);
     }).catch(() => setLoading(false));
   }, [dateRange]);
@@ -117,12 +120,7 @@ export default function AdminDashboard() {
 
       {/* KPI cards */}
       <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 10 }}>
-        <KpiCard
-          label="Visitors"
-          value="—"
-          color={T.textDim}
-          sub="Set up analytics"
-        />
+        <KpiCard label="Visitors" value={kpis?.visitors ?? '…'} color={T.accent} />
         <KpiCard label="Signups" value={kpis?.signups ?? '…'} color={T.green} />
         <KpiCard label="Active Trips" value={kpis?.activeTrips ?? '…'} color={T.accent} />
         <KpiCard label="Pro Subscribers" value={kpis?.proSubscribers ?? '…'} color={T.purple} />
@@ -266,10 +264,42 @@ export default function AdminDashboard() {
             <tbody>
               {topCountries.length === 0 ? (
                 <tr><td colSpan={2} style={{ color: T.textDim, textAlign: 'center', padding: '20px 0' }}>No country data yet</td></tr>
-              ) : topCountries.map((c, i) => (
-                <tr key={c.country} style={{ borderTop: i === 0 ? 'none' : `1px solid ${T.border}` }}>
-                  <td style={{ padding: '10px 0', color: T.text }}>{c.country}</td>
-                  <td style={{ padding: '10px 0', color: T.accent, fontWeight: 700 }}>{c.count}</td>
+              ) : topCountries.map((c, i) => {
+                const { flag, name } = countryDisplay(c.country);
+                return (
+                  <tr key={c.country} style={{ borderTop: i === 0 ? 'none' : `1px solid ${T.border}` }}>
+                    <td style={{ padding: '10px 0', color: T.text }}>{flag} {name}</td>
+                    <td style={{ padding: '10px 0', color: T.accent, fontWeight: 700 }}>{c.count}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <div style={{
+          flex: '1 1 220px', background: T.card, borderRadius: 12,
+          border: `1px solid ${T.border}`, padding: '20px 24px', overflow: 'hidden',
+        }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: T.text, marginBottom: 14 }}>Top Referrers</div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr>
+                {['Source', 'Views'].map(h => (
+                  <th key={h} style={{
+                    textAlign: 'left', color: T.textDim, fontWeight: 600,
+                    paddingBottom: 10, borderBottom: `1px solid ${T.border}`,
+                  }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {topReferrers.length === 0 ? (
+                <tr><td colSpan={2} style={{ color: T.textDim, textAlign: 'center', padding: '20px 0' }}>No referrer data yet</td></tr>
+              ) : topReferrers.map((r, i) => (
+                <tr key={r.referrer} style={{ borderTop: i === 0 ? 'none' : `1px solid ${T.border}` }}>
+                  <td style={{ padding: '10px 0', color: T.text, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.referrer}</td>
+                  <td style={{ padding: '10px 0', color: T.accent, fontWeight: 700 }}>{r.count}</td>
                 </tr>
               ))}
             </tbody>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
+import { trackPageview } from './lib/analytics';
 import { AuthScreen } from './AuthScreen.jsx';
 import { PaywallScreen } from './PaywallScreen.jsx';
 import LandingPage from './LandingPage.jsx';
@@ -84,6 +85,11 @@ export default function App() {
     }, 1500);
     return () => clearTimeout(timer);
   }, [user, loading, isInstalled]);
+
+  // Track pageview on every view change (fires on mount too)
+  useEffect(() => {
+    trackPageview(VIEW_TO_PATH[view] || '/');
+  }, [view]);
 
   // Sync view → URL (pushState so browser back button has history to traverse)
   useEffect(() => {
