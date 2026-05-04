@@ -122,8 +122,8 @@ export default function App() {
     return <LandingPage onGetStarted={() => setView("auth")} onLogin={() => setView("auth")} />;
   };
 
-  // Global logout: show on any screen where user is logged in but not in TripApp
-  const showGlobalLogout = !!user && view !== "app";
+  // Global logout: show on every logged-in screen (TripApp's gear-icon logout can coexist)
+  const showGlobalLogout = !!user;
 
   return (
     <>
