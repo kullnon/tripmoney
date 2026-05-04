@@ -18,7 +18,6 @@ export default async function handler(req, res) {
     if (!plan || !PRICES[plan]) {
       return res.status(400).json({ error: 'Invalid plan.' });
     }
-
     if (!userId || !email) {
       return res.status(400).json({ error: 'Missing userId or email.' });
     }
@@ -37,7 +36,36 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ url: session.url });
   } catch (err) {
-    console.error('Stripe checkout error:', err);
-    return res.status(500).json({ error: err.message });
+    console.error('Stripe checkout error:', {
+      type: err.type,
+      code: err.code,
+      message: err.message,
+      requestId: err.requestId,
+    });
+
+    if (err.type === 'StripeAuthenticationError') {
+      return res.status(503).json({
+        error: 'Payment service temporarily unavailable. Please try again in a moment.',
+      });
+    }
+    if (err.type === 'StripeCardError') {
+      return res.status(400).json({
+        error: 'Payment could not be processed. Please check your card details.',
+      });
+    }
+    if (err.type === 'StripeRateLimitError') {
+      return res.status(429).json({
+        error: 'Too many requests. Please wait a moment and try again.',
+      });
+    }
+    if (err.type === 'StripeInvalidRequestError') {
+      return res.status(400).json({
+        error: 'Unable to start checkout. Please try again or contact support.',
+      });
+    }
+
+    return res.status(500).json({
+      error: 'Something went wrong. Please try again, or contact support if this continues.',
+    });
   }
 }
