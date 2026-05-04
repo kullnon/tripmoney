@@ -5,6 +5,7 @@ import { PaywallScreen } from './PaywallScreen.jsx';
 import LandingPage from './LandingPage.jsx';
 import TripApp from './TripApp.jsx';
 import { useInstallPrompt, InstallModal } from './InstallPrompt.jsx';
+import AdminApp from './admin/AdminApp.jsx';
 
 const T = {
   bg: "#0A0F1E", accent: "#00D4FF", text: "#F0F4FF", textMid: "#8A9BC4", textDim: "#4A5880",
@@ -64,6 +65,12 @@ export default function App() {
     }, 1500);
     return () => clearTimeout(timer);
   }, [user, loading, isInstalled]);
+
+  // Admin route: bypass the splash-screen timer, but still wait for auth to settle
+  if (window.location.pathname === '/admin') {
+    if (loading) return <LoadingScreen />;
+    return <AdminApp />;
+  }
 
   if (loading || !minLoadDone) return <LoadingScreen />;
 
