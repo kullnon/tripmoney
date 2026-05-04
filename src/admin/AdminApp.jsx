@@ -35,7 +35,8 @@ export default function AdminApp() {
   }
 
   if (!user) {
-    window.location.href = '/';
+    sessionStorage.setItem('tm-redirect', JSON.stringify({ path: '/admin', ts: Date.now() }));
+    window.location.href = '/auth';
     return null;
   }
 

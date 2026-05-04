@@ -53,7 +53,23 @@ export default function App() {
 
   useEffect(() => {
     if (loading) return;
-    if (user) setView("app");
+    if (user) {
+      const stored = sessionStorage.getItem('tm-redirect');
+      if (stored) {
+        try {
+          const { path, ts } = JSON.parse(stored);
+          sessionStorage.removeItem('tm-redirect');
+          const fresh = Date.now() - ts < 10 * 60 * 1000;
+          if (fresh && path === '/admin') {
+            window.location.href = '/admin';
+            return;
+          }
+        } catch {
+          sessionStorage.removeItem('tm-redirect');
+        }
+      }
+      setView("app");
+    }
   }, [user, loading]);
 
   // PWA install nudge: fires once per session, only on mobile, only when user just signed in and app isn't installed
