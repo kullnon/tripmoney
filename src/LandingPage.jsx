@@ -7,7 +7,7 @@ const T = {
   text: "#F0F4FF", textMid: "#8A9BC4", textDim: "#4A5880",
 };
 
-export default function LandingPage({ onGetStarted, onLogin, onInstall, canInstall, isInstalled, isIOS, isAndroid, triggerInstall }) {
+export default function LandingPage({ onGetStarted, onLogin, onInstall, onGoPro, canInstall, isInstalled, isIOS, isAndroid, triggerInstall }) {
   const [annual, setAnnual] = useState(true);
   const [scrollY, setScrollY] = useState(0);
   const [installing, setInstalling] = useState(false);
@@ -447,7 +447,7 @@ export default function LandingPage({ onGetStarted, onLogin, onInstall, canInsta
                 <span style={{ color: T.textDim, fontSize: 15 }}>forever</span>
               </div>
               <div style={{ color: T.textMid, fontSize: 14, marginBottom: 28 }}>Perfect for testing on your next trip.</div>
-              <button style={{ width: "100%", background: T.card, color: T.accent, border: `2px solid ${T.accent}44`, borderRadius: 14, padding: "14px", fontSize: 16, fontWeight: 800, cursor: "pointer", marginBottom: 28 }} className="cta-btn">Start Free</button>
+              <button onClick={() => onGetStarted?.()} style={{ width: "100%", background: T.card, color: T.accent, border: `2px solid ${T.accent}44`, borderRadius: 14, padding: "14px", fontSize: 16, fontWeight: 800, cursor: "pointer", marginBottom: 28 }} className="cta-btn">Start Free</button>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {["1 trip", "Single-leg only", "Basic categories", "Local storage", "Budget tracking"].map(f => (
                   <div key={f} style={{ display: "flex", alignItems: "center", gap: 10, color: T.textMid, fontSize: 14 }}>
@@ -471,7 +471,7 @@ export default function LandingPage({ onGetStarted, onLogin, onInstall, canInsta
                 <span style={{ color: T.textDim, fontSize: 15 }}>.{annual ? "67" : "99"}/mo</span>
               </div>
               <div style={{ color: T.textMid, fontSize: 14, marginBottom: 28 }}>{annual ? "Billed $79.99/year" : "Billed monthly"}{annual ? " — save $40" : ""}</div>
-              <button style={{ width: "100%", background: T.accent, color: T.bg, border: "none", borderRadius: 14, padding: "14px", fontSize: 16, fontWeight: 900, cursor: "pointer", marginBottom: 28 }} className="cta-btn">Go Pro →</button>
+              <button onClick={() => (onGoPro ?? onGetStarted)?.()} style={{ width: "100%", background: T.accent, color: T.bg, border: "none", borderRadius: 14, padding: "14px", fontSize: 16, fontWeight: 900, cursor: "pointer", marginBottom: 28 }} className="cta-btn">Go Pro →</button>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {["Unlimited trips", "Multi-leg journeys", "100+ currencies", "PDF & email reports", "Cloud sync across devices", "Priority support", "Budget projections", "Trip health score", "All future features"].map(f => (
                   <div key={f} style={{ display: "flex", alignItems: "center", gap: 10, color: T.text, fontSize: 14 }}>

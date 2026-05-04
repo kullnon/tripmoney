@@ -108,6 +108,7 @@ export default function App() {
       return <LandingPage
         onGetStarted={() => setView("auth")}
         onLogin={() => setView("auth")}
+        onGoPro={() => user ? setView("paywall") : setView("auth")}
         onInstall={() => setShowInstallModal(true)}
         canInstall={canInstall}
         isInstalled={isInstalled}
