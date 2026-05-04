@@ -1,66 +1,29 @@
 import { supabase } from '../supabase';
 
 // ─── Country display helpers ──────────────────────────────────────────────────
-const COUNTRY_NAMES = {
-  US: { name: 'United States',   flag: '🇺🇸' },
-  GB: { name: 'United Kingdom',  flag: '🇬🇧' },
-  FR: { name: 'France',          flag: '🇫🇷' },
-  DE: { name: 'Germany',         flag: '🇩🇪' },
-  IT: { name: 'Italy',           flag: '🇮🇹' },
-  ES: { name: 'Spain',           flag: '🇪🇸' },
-  JP: { name: 'Japan',           flag: '🇯🇵' },
-  MX: { name: 'Mexico',          flag: '🇲🇽' },
-  CA: { name: 'Canada',          flag: '🇨🇦' },
-  AU: { name: 'Australia',       flag: '🇦🇺' },
-  TR: { name: 'Turkey',          flag: '🇹🇷' },
-  GR: { name: 'Greece',          flag: '🇬🇷' },
-  TH: { name: 'Thailand',        flag: '🇹🇭' },
-  PT: { name: 'Portugal',        flag: '🇵🇹' },
-  NL: { name: 'Netherlands',     flag: '🇳🇱' },
-  CH: { name: 'Switzerland',     flag: '🇨🇭' },
-  AT: { name: 'Austria',         flag: '🇦🇹' },
-  BE: { name: 'Belgium',         flag: '🇧🇪' },
-  PL: { name: 'Poland',          flag: '🇵🇱' },
-  CZ: { name: 'Czech Republic',  flag: '🇨🇿' },
-  HR: { name: 'Croatia',         flag: '🇭🇷' },
-  HU: { name: 'Hungary',         flag: '🇭🇺' },
-  RO: { name: 'Romania',         flag: '🇷🇴' },
-  RU: { name: 'Russia',          flag: '🇷🇺' },
-  CN: { name: 'China',           flag: '🇨🇳' },
-  IN: { name: 'India',           flag: '🇮🇳' },
-  BR: { name: 'Brazil',          flag: '🇧🇷' },
-  AR: { name: 'Argentina',       flag: '🇦🇷' },
-  CL: { name: 'Chile',           flag: '🇨🇱' },
-  CO: { name: 'Colombia',        flag: '🇨🇴' },
-  PE: { name: 'Peru',            flag: '🇵🇪' },
-  SG: { name: 'Singapore',       flag: '🇸🇬' },
-  MY: { name: 'Malaysia',        flag: '🇲🇾' },
-  ID: { name: 'Indonesia',       flag: '🇮🇩' },
-  KR: { name: 'South Korea',     flag: '🇰🇷' },
-  VN: { name: 'Vietnam',         flag: '🇻🇳' },
-  PH: { name: 'Philippines',     flag: '🇵🇭' },
-  TW: { name: 'Taiwan',          flag: '🇹🇼' },
-  AE: { name: 'UAE',             flag: '🇦🇪' },
-  SA: { name: 'Saudi Arabia',    flag: '🇸🇦' },
-  MA: { name: 'Morocco',         flag: '🇲🇦' },
-  EG: { name: 'Egypt',           flag: '🇪🇬' },
-  ZA: { name: 'South Africa',    flag: '🇿🇦' },
-  NG: { name: 'Nigeria',         flag: '🇳🇬' },
-  NZ: { name: 'New Zealand',     flag: '🇳🇿' },
-  SE: { name: 'Sweden',          flag: '🇸🇪' },
-  NO: { name: 'Norway',          flag: '🇳🇴' },
-  DK: { name: 'Denmark',         flag: '🇩🇰' },
-  FI: { name: 'Finland',         flag: '🇫🇮' },
-  IE: { name: 'Ireland',         flag: '🇮🇪' },
-  IL: { name: 'Israel',          flag: '🇮🇱' },
-  HK: { name: 'Hong Kong',       flag: '🇭🇰' },
-  MO: { name: 'Macau',           flag: '🇲🇴' },
+// Flag: regional indicator symbols A=0x1F1E6, so offset by char code from 'A'
+export const codeToFlag = (code) => {
+  if (!code || code.length !== 2) return '';
+  try {
+    return String.fromCodePoint(...[...code.toUpperCase()].map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
+  } catch {
+    return '';
+  }
+};
+
+// Name: Intl.DisplayNames covers every ISO 3166-1 alpha-2 code natively
+export const codeToCountryName = (code) => {
+  if (!code) return 'Unknown';
+  try {
+    return new Intl.DisplayNames(['en'], { type: 'region' }).of(code.toUpperCase()) || code;
+  } catch {
+    return code;
+  }
 };
 
 export function countryDisplay(code) {
   if (!code) return { flag: '🌍', name: 'Unknown' };
-  const info = COUNTRY_NAMES[code.toUpperCase()];
-  return info || { flag: '', name: code };
+  return { flag: codeToFlag(code), name: codeToCountryName(code) };
 }
 
 // ─── Date helper ─────────────────────────────────────────────────────────────

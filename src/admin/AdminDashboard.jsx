@@ -3,7 +3,7 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
 } from 'recharts';
-import { getKpis, getSignupsOverTime, getPlanBreakdown, getRecentSignups, getTopCountries, getTopReferrers, countryDisplay } from './adminQueries';
+import { getKpis, getSignupsOverTime, getPlanBreakdown, getRecentSignups, getTopCountries, getTopReferrers, codeToFlag, codeToCountryName } from './adminQueries';
 
 const T = {
   bg: "#0A0F1E", surface: "#111827", card: "#1A2235", cardHover: "#1F2A40",
@@ -264,15 +264,15 @@ export default function AdminDashboard() {
             <tbody>
               {topCountries.length === 0 ? (
                 <tr><td colSpan={2} style={{ color: T.textDim, textAlign: 'center', padding: '20px 0' }}>No country data yet</td></tr>
-              ) : topCountries.map((c, i) => {
-                const { flag, name } = countryDisplay(c.country);
-                return (
-                  <tr key={c.country} style={{ borderTop: i === 0 ? 'none' : `1px solid ${T.border}` }}>
-                    <td style={{ padding: '10px 0', color: T.text }}>{flag} {name}</td>
-                    <td style={{ padding: '10px 0', color: T.accent, fontWeight: 700 }}>{c.count}</td>
-                  </tr>
-                );
-              })}
+              ) : topCountries.map((c, i) => (
+                <tr key={c.country} style={{ borderTop: i === 0 ? 'none' : `1px solid ${T.border}` }}>
+                  <td style={{ padding: '10px 0', color: T.text }}>
+                    <span style={{ fontSize: 18, marginRight: 6 }}>{codeToFlag(c.country)}</span>
+                    {codeToCountryName(c.country)}
+                  </td>
+                  <td style={{ padding: '10px 0', color: T.accent, fontWeight: 700 }}>{c.count}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

@@ -21,7 +21,6 @@ function getExternalReferrer() {
 }
 
 function getCountryHint() {
-  // Use language tag country suffix as a geo proxy (e.g. "en-US" → "US")
   try {
     const lang = navigator.language || '';
     const parts = lang.split('-');
@@ -31,7 +30,14 @@ function getCountryHint() {
   }
 }
 
+// Dedupe: suppress duplicate calls for the same path within 500ms (React StrictMode double-mount)
+let lastTracked = { path: null, ts: 0 };
+
 export function trackPageview(path) {
+  const now = Date.now();
+  if (path === lastTracked.path && now - lastTracked.ts < 500) return;
+  lastTracked = { path, ts: now };
+
   try {
     const visitorId = getVisitorId();
     supabase.rpc('track_pageview', {

@@ -86,9 +86,9 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [user, loading, isInstalled]);
 
-  // Track pageview on every view change (fires on mount too)
+  // Track every route including /admin — URL-sync effect runs first so pathname is always current
   useEffect(() => {
-    trackPageview(VIEW_TO_PATH[view] || '/');
+    trackPageview(window.location.pathname);
   }, [view]);
 
   // Sync view → URL (pushState so browser back button has history to traverse)
