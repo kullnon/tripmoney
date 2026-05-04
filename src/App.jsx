@@ -11,6 +11,9 @@ const T = {
   bg: "#0A0F1E", accent: "#00D4FF", text: "#F0F4FF", textMid: "#8A9BC4", textDim: "#4A5880",
 };
 
+const PATH_TO_VIEW = { '/auth': 'auth', '/pricing': 'paywall', '/app': 'app' };
+const VIEW_TO_PATH = { landing: '/', auth: '/auth', paywall: '/pricing', app: '/app' };
+
 function LoadingScreen() {
   return (
     <div style={{
@@ -36,7 +39,7 @@ function LoadingScreen() {
 
 export default function App() {
   const { user, profile, loading, isPro, signOut } = useAuth();
-  const [view, setView] = useState("landing");
+  const [view, setView] = useState(() => PATH_TO_VIEW[window.location.pathname] || 'landing');
   const [paywallFeature, setPaywallFeature] = useState("");
   const [minLoadDone, setMinLoadDone] = useState(false);
 
@@ -66,6 +69,27 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [user, loading, isInstalled]);
 
+  // Sync view → URL (pushState so browser back button has history to traverse)
+  useEffect(() => {
+    if (window.location.pathname.startsWith('/admin')) return;
+    const newPath = VIEW_TO_PATH[view] || '/';
+    if (window.location.pathname !== newPath) {
+      window.history.pushState({ view }, '', newPath);
+    }
+  }, [view]);
+
+  // Browser/phone hardware back button → restore view from URL
+  useEffect(() => {
+    const onPop = () => {
+      const path = window.location.pathname;
+      if (!path.startsWith('/admin')) {
+        setView(PATH_TO_VIEW[path] || 'landing');
+      }
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
   // Admin route: bypass the splash-screen timer, but still wait for auth to settle
   if (window.location.pathname === '/admin') {
     if (loading) return <LoadingScreen />;
@@ -73,6 +97,11 @@ export default function App() {
   }
 
   if (loading || !minLoadDone) return <LoadingScreen />;
+
+  const handleSignOut = async () => {
+    await signOut();
+    setView("landing");
+  };
 
   const renderView = () => {
     if (view === "landing" && !user) {
@@ -89,12 +118,34 @@ export default function App() {
     }
     if (view === "auth" && !user) return <AuthScreen onBack={() => setView("landing")} />;
     if (view === "paywall") return <PaywallScreen feature={paywallFeature} onBack={() => setView("app")} user={user} />;
-    if (user) return <TripApp user={user} profile={profile} isPro={isPro} onSignOut={signOut} onInstall={() => setShowInstallModal(true)} isInstalled={isInstalled} canInstall={canInstall} isIOS={isIOS} isMobile={/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)} onPaywall={(feature) => { setPaywallFeature(feature); setView("paywall"); }} />;
+    if (user) return <TripApp user={user} profile={profile} isPro={isPro} onSignOut={handleSignOut} onInstall={() => setShowInstallModal(true)} isInstalled={isInstalled} canInstall={canInstall} isIOS={isIOS} isMobile={/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)} onPaywall={(feature) => { setPaywallFeature(feature); setView("paywall"); }} />;
     return <LandingPage onGetStarted={() => setView("auth")} onLogin={() => setView("auth")} />;
   };
 
+  // Global logout: show on any screen where user is logged in but not in TripApp
+  const showGlobalLogout = !!user && view !== "app";
+
   return (
     <>
+      {showGlobalLogout && (
+        <div style={{ position: "fixed", top: 16, right: 20, zIndex: 200 }}>
+          <button
+            onClick={handleSignOut}
+            style={{
+              background: "transparent",
+              border: `1px solid ${T.accent}55`,
+              color: T.accent,
+              borderRadius: 10,
+              padding: "8px 16px",
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            Log out
+          </button>
+        </div>
+      )}
       {renderView()}
       {showInstallModal && <InstallModal onClose={() => setShowInstallModal(false)} isIOS={isIOS} isAndroid={isAndroid} canInstall={canInstall} triggerInstall={triggerInstall} />}
     </>

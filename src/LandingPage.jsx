@@ -9,7 +9,6 @@ const T = {
 
 export default function LandingPage({ onGetStarted, onLogin, onInstall, canInstall, isInstalled, isIOS, isAndroid, triggerInstall }) {
   const [annual, setAnnual] = useState(true);
-  const [emailInput, setEmailInput] = useState("");
   const [scrollY, setScrollY] = useState(0);
   const [installing, setInstalling] = useState(false);
 
@@ -504,21 +503,6 @@ export default function LandingPage({ onGetStarted, onLogin, onInstall, canInsta
               </div>
             ))}
           </div>
-        </Section>
-      </section>
-
-      {/* ─── FINAL CTA ─── */}
-      <section id="signup" style={{ padding: "100px 0", textAlign: "center" }}>
-        <Section>
-          <h2 style={{ fontFamily: "Sora", fontSize: "clamp(28px, 4vw, 48px)", fontWeight: 900, letterSpacing: -2, marginBottom: 16 }}>
-            Your next trip deserves<br /><span style={{ color: T.accent }}>better tracking</span>
-          </h2>
-          <p style={{ color: T.textMid, fontSize: 17, marginBottom: 40, maxWidth: 480, margin: "0 auto 40px" }}>Join hundreds of travelers who never lose track of their spending.</p>
-          <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", maxWidth: 480, margin: "0 auto" }}>
-            <input value={emailInput} onChange={e => setEmailInput(e.target.value)} type="email" placeholder="Your email" style={{ flex: "1 1 240px", background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, padding: "16px 20px", color: T.text, fontSize: 16, outline: "none", fontFamily: "inherit" }} />
-            <button className="cta-btn" style={{ background: T.accent, color: T.bg, border: "none", borderRadius: 14, padding: "16px 32px", fontSize: 16, fontWeight: 900, cursor: "pointer", flexShrink: 0 }}>Get Started Free</button>
-          </div>
-          <div style={{ color: T.textDim, fontSize: 13, marginTop: 16 }}>Free forever. No credit card required.</div>
         </Section>
       </section>
 
