@@ -1,4 +1,8 @@
 User-agent: *
 Allow: /
+Disallow: /app
+Disallow: /admin
+Disallow: /auth
+Disallow: /trip/
 
-Sitemap: https://mytripmoney.com/sitemap.xml
+Sitemap: https://www.mytripmoney.com/sitemap.xml
