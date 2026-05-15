@@ -1,8 +1,16 @@
 {
   "rewrites": [
+    { "source": "/blog", "destination": "/api/blog-index" },
+    { "source": "/blog/", "destination": "/api/blog-index" },
+    { "source": "/blog/:slug", "destination": "/api/blog-post?slug=:slug" },
     {
-      "source": "/((?!sitemap\\.xml|robots\\.txt|.*\\..*).*)",
+      "source": "/((?!sitemap\\.xml|robots\\.txt|api/.*|.*\\..*).*)",
       "destination": "/index.html"
     }
+  ],
+  "crons": [
+    { "path": "/api/editor-agent",    "schedule": "0 9 * * *" },
+    { "path": "/api/blog-generate",   "schedule": "0 11 * * *" },
+    { "path": "/api/newsletter-auto", "schedule": "0 14 * * 1" }
   ]
 }
