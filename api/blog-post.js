@@ -9,6 +9,7 @@ export default async function handler(req, res) {
   const slug = (req.query?.slug || '').toString().toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 80);
   if (!slug) {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
     return res.status(404).send(renderNotFound());
   }
 
