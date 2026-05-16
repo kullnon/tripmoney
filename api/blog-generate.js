@@ -140,9 +140,9 @@ ARTICLE REQUIREMENTS:
     let parsed;
     try {
       parsed = JSON.parse(clean);
-    } catch {
-      console.error('Failed to parse AI response:', clean.slice(0, 200));
-      return res.status(500).json({ ok: false, error: 'AI returned invalid JSON' });
+    } catch (e) {
+      console.error('Failed to parse AI response:', clean.slice(0, 500));
+      return res.status(500).json({ ok: false, error: 'AI returned invalid JSON', parse_error: e.message, ai_response_preview: clean.slice(0, 500), ai_response_length: clean.length });
     }
 
     if (!parsed.title || !parsed.slug || !parsed.body_html) {
