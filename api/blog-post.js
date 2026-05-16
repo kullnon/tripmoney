@@ -37,7 +37,6 @@ export default async function handler(req, res) {
       .limit(4);
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.setHeader('Cache-Control', 's-maxage=600, stale-while-revalidate=86400');
     return res.status(200).send(renderPost(post, more || []));
   } catch (e) {
     console.error('blog-post error:', e);
