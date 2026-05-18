@@ -91,7 +91,7 @@ export default function LandingPage({ onGetStarted, onLogin, onInstall, onGoPro,
         .cta-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 40px ${T.accent}44; }
       
 .nav-pricing { display: inline; }
-@media (max-width: 600px) { .nav-pricing { font-size: 13px; padding: 6px 4px; } }
+@media (max-width: 600px) { .nav-pricing { font-size: 13px; padding: 6px 4px; } .nav-cta { display: none !important; } }
 `}</style>
 
       {/* ─── NAV ─── */}
@@ -113,7 +113,7 @@ export default function LandingPage({ onGetStarted, onLogin, onInstall, onGoPro,
           <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
             <a href="#pricing" className="nav-pricing" style={{ color: T.textMid, textDecoration: "none", fontSize: 14, fontWeight: 600 }}>Pricing</a>
             <a href="/blog" className="nav-pricing" style={{ color: T.textMid, textDecoration: "none", fontSize: 14, fontWeight: 600 }}>Blog</a>
-            <button onClick={() => onGetStarted && onGetStarted()} style={{ background: T.accent, color: T.bg, border: "none", borderRadius: 10, padding: "10px 20px", fontSize: 14, fontWeight: 800, cursor: "pointer" }} className="cta-btn">Get Started</button>
+            <button onClick={() => onGetStarted && onGetStarted()} style={{ background: T.accent, color: T.bg, border: "none", borderRadius: 10, padding: "10px 20px", fontSize: 14, fontWeight: 800, cursor: "pointer" }} className="cta-btn nav-cta">Get Started</button>
           </div>
         </Section>
       </nav>
