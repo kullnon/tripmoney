@@ -18,10 +18,13 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <AuthProvider>
-      <App />
-    </AuthProvider>
-  </React.StrictMode>
-);
+// Blog routes are server-rendered HTML — don't mount React over them
+if (!window.location.pathname.startsWith('/blog')) {
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    <React.StrictMode>
+      <AuthProvider>
+        <App />
+      </AuthProvider>
+    </React.StrictMode>
+  );
+}
