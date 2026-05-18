@@ -112,7 +112,7 @@ export default function LandingPage({ onGetStarted, onLogin, onInstall, onGoPro,
           </div>
           <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
             <a href="#pricing" className="nav-pricing" style={{ color: T.textMid, textDecoration: "none", fontSize: 14, fontWeight: 600 }}>Pricing</a>
-            <a href="/blog" target="_self" rel="noopener" className="nav-pricing" style={{ color: T.textMid, textDecoration: "none", fontSize: 14, fontWeight: 600 }}>Blog</a>
+            <a href="https://blog.mytripmoney.com" className="nav-pricing" style={{ color: T.textMid, textDecoration: "none", fontSize: 14, fontWeight: 600 }}>Blog</a>
             <button onClick={() => onGetStarted && onGetStarted()} style={{ background: T.accent, color: T.bg, border: "none", borderRadius: 10, padding: "10px 20px", fontSize: 14, fontWeight: 800, cursor: "pointer" }} className="cta-btn nav-cta">Get Started</button>
           </div>
         </Section>
