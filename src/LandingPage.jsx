@@ -91,7 +91,7 @@ export default function LandingPage({ onGetStarted, onLogin, onInstall, onGoPro,
         .cta-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 40px ${T.accent}44; }
       
 .nav-pricing { display: inline; }
-@media (max-width: 600px) { .nav-pricing { display: none !important; } }
+@media (max-width: 600px) { .nav-pricing { font-size: 13px; padding: 6px 4px; } }
 `}</style>
 
       {/* ─── NAV ─── */}
