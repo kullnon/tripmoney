@@ -54,6 +54,7 @@ export default function App() {
 
   useEffect(() => {
     if (loading) return;
+    if (window.location.pathname.startsWith('/blog')) return;
     if (user) {
       const stored = sessionStorage.getItem('tm-redirect');
       if (stored) {
@@ -93,7 +94,7 @@ export default function App() {
 
   // Sync view → URL (pushState so browser back button has history to traverse)
   useEffect(() => {
-    if (window.location.pathname.startsWith('/admin')) return;
+    if (window.location.pathname.startsWith('/admin') || window.location.pathname.startsWith('/blog')) return;
     const newPath = VIEW_TO_PATH[view] || '/';
     if (window.location.pathname !== newPath) {
       window.history.pushState({ view }, '', newPath);
@@ -104,7 +105,7 @@ export default function App() {
   useEffect(() => {
     const onPop = () => {
       const path = window.location.pathname;
-      if (!path.startsWith('/admin')) {
+      if (!path.startsWith('/admin') && !path.startsWith('/blog')) {
         setView(PATH_TO_VIEW[path] || 'landing');
       }
     };
@@ -116,6 +117,10 @@ export default function App() {
   if (window.location.pathname === '/admin') {
     if (loading) return <LoadingScreen />;
     return <AdminApp />;
+  }
+  // Blog routes: SSR'd by /api/blog-index and /api/blog-post — don't render SPA
+  if (window.location.pathname.startsWith('/blog')) {
+    return null;
   }
 
   if (loading || !minLoadDone) return <LoadingScreen />;
