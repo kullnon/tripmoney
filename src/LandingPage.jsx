@@ -3,7 +3,7 @@ import Estimator from "./components/Estimator.jsx";
 import FAQSection from "./components/FAQSection.jsx";
 import {
   destinationCosts, POPULAR_SLUGS,
-  ORIGIN_CODES, DEFAULT_ORIGIN, originName, flightEstimateFor,
+  ORIGINS, ORIGIN_CODES, DEFAULT_ORIGIN, flightEstimateFor,
 } from "../lib/destinationCosts.js";
 
 const ESTIMATOR_FAQS = [
@@ -135,6 +135,13 @@ export default function LandingPage({ onGetStarted, onLogin, onInstall, onGoPro,
       
 .nav-pricing { display: inline; }
 @media (max-width: 600px) { .nav-pricing { font-size: 13px; padding: 6px 4px; } .nav-cta { display: none !important; } }
+
+.popular-origin-row { display: inline-flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: 14px; background: ${T.card}; border: 1px solid ${T.border}; transition: border-color 0.15s; }
+.popular-origin-row:focus-within { border-color: ${T.accent}; }
+.popular-origin-row label { color: ${T.textMid}; font-size: 14px; font-weight: 600; white-space: nowrap; }
+.popular-origin-row select { background: transparent; border: none; color: ${T.text}; font-size: 16px; font-weight: 700; font-family: inherit; padding: 4px 24px 4px 4px; cursor: pointer; outline: none; -webkit-appearance: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2300D4FF' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 4px center; }
+.popular-origin-row select:hover { color: ${T.accent}; }
+@media (max-width: 600px) { .popular-origin-row { flex-direction: column; align-items: stretch; gap: 4px; padding: 12px 16px; } .popular-origin-row label { text-align: center; } .popular-origin-row select { text-align: center; padding-right: 4px; background-position: right center; } }
 `}</style>
 
       {/* ─── NAV ─── */}
@@ -212,16 +219,29 @@ export default function LandingPage({ onGetStarted, onLogin, onInstall, onGoPro,
       {/* ─── POPULAR TRIP ESTIMATES (link grid for GEO/SEO) ─── */}
       <section style={{ padding: "60px 0 100px", background: T.surface, borderTop: `1px solid ${T.border}`, borderBottom: `1px solid ${T.border}` }}>
         <Section>
-          <div style={{ textAlign: "center", marginBottom: 40 }}>
+          <div style={{ textAlign: "center", marginBottom: 28 }}>
             <h2 style={{ fontFamily: "Sora", fontSize: "clamp(24px, 3.5vw, 34px)", fontWeight: 900, letterSpacing: -0.8, color: T.text, marginBottom: 10 }}>
               Popular trip estimates
             </h2>
-            <p style={{ color: T.textMid, fontSize: 15, marginBottom: 6 }}>
+            <p style={{ color: T.textMid, fontSize: 15 }}>
               Tap a destination for a 2026 budget guide and pre-filled estimator.
             </p>
-            <p style={{ color: T.accent, fontSize: 13, fontWeight: 700 }}>
-              Prices from {originName(origin)} · 7-day mid-range
-            </p>
+          </div>
+          {/* Origin selector — shares `origin` state with the estimator (lifted
+              in this file), so changing either updates both + the card totals. */}
+          <div style={{ textAlign: "center", marginBottom: 24 }}>
+            <div className="popular-origin-row">
+              <label htmlFor="popular-origin">Showing prices from</label>
+              <select
+                id="popular-origin"
+                value={origin}
+                onChange={(e) => handleOriginChange(e.target.value)}
+              >
+                {ORIGINS.map((o) => (
+                  <option key={o.code} value={o.code}>{o.name}</option>
+                ))}
+              </select>
+            </div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14, maxWidth: 980, margin: "0 auto" }}>
             {POPULAR_SLUGS.map((slug) => {
