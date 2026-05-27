@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { destinationCosts, destinationList, TIERS, HOME_CURRENCIES } from "../../lib/destinationCosts.js";
+import {
+  destinationCosts, destinationList, TIERS, HOME_CURRENCIES,
+  ORIGINS, ORIGIN_CODES, DEFAULT_ORIGIN, originName, flightEstimateFor,
+} from "../../lib/destinationCosts.js";
 
 const T = {
   bg: "#0A0F1E", surface: "#111827", card: "#1A2235",
@@ -80,6 +83,17 @@ export default function Estimator({ preselectSlug = "paris", compact = false }) 
   const [travelers, setTravelers] = useState(1);
   const [homeCurrency, setHomeCurrency] = useState("USD");
   const [rate, setRate] = useState(1); // USD → homeCurrency multiplier
+  // Departing-from country — persisted to localStorage so returning users
+  // don't have to re-pick on every visit. Independent of home currency
+  // (a user in Mexico may still want to see costs in USD).
+  const [origin, setOrigin] = useState(() => {
+    if (typeof window === "undefined") return DEFAULT_ORIGIN;
+    try {
+      const stored = localStorage.getItem("tripOrigin");
+      if (stored && ORIGIN_CODES.includes(stored)) return stored;
+    } catch { /* ignore */ }
+    return DEFAULT_ORIGIN;
+  });
 
   const destinations = useMemo(() => destinationList(), []);
   const dest = destinationCosts[slug];
@@ -101,7 +115,8 @@ export default function Estimator({ preselectSlug = "paris", compact = false }) 
   const tierData = dest[tier];
   const perDayUsd = tierData.accommodation + tierData.food + tierData.transport + tierData.activities;
   const onGroundUsd = perDayUsd * Math.max(1, Number(days) || 1) * Math.max(1, Number(travelers) || 1);
-  const flightUsd   = dest.flightEstimateUSD * Math.max(1, Number(travelers) || 1);
+  const perTravelerFlight = flightEstimateFor(slug, origin);
+  const flightUsd   = perTravelerFlight * Math.max(1, Number(travelers) || 1);
   const grandTotalUsd = onGroundUsd + flightUsd;
 
   const toHome = (usd) => usd * rate;
@@ -155,6 +170,22 @@ export default function Estimator({ preselectSlug = "paris", compact = false }) 
       boxShadow: `0 24px 60px rgba(0,0,0,0.35), 0 0 80px ${T.accent}10`,
     }}>
       <div id="estimator-inputs">
+        {/* Departing from */}
+        <Label>Departing from</Label>
+        <select
+          value={origin}
+          onChange={(e) => {
+            const next = e.target.value;
+            setOrigin(next);
+            try { localStorage.setItem("tripOrigin", next); } catch { /* ignore */ }
+          }}
+          style={{ ...inputBase, appearance: "auto", marginBottom: 14 }}
+        >
+          {ORIGINS.map((o) => (
+            <option key={o.code} value={o.code}>{o.name}</option>
+          ))}
+        </select>
+
         {/* Destination */}
         <Label>Destination</Label>
         <select
@@ -294,7 +325,7 @@ export default function Estimator({ preselectSlug = "paris", compact = false }) 
           <span style={{ color: T.text, fontWeight: 700 }}>{fmtMoney(onGroundHome, homeCurrency)}</span>
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", color: T.textMid, fontSize: 13, padding: "10px 0", borderTop: `1px solid ${T.border}` }}>
-          <span>Flights estimate <span style={{ color: T.textDim }}>(rough)</span></span>
+          <span>Flights estimate <span style={{ color: T.textDim }}>(from {originName(origin)}, rough)</span></span>
           <span style={{ color: T.text, fontWeight: 700 }}>{fmtMoney(flightHome, homeCurrency)}</span>
         </div>
       </div>

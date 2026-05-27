@@ -6,7 +6,7 @@
 // static cost breakdown that crawlers can index without running JS. The
 // interactive estimator lives at /?destination=:slug and is one click away.
 
-import { destinationCosts } from '../lib/destinationCosts.js';
+import { destinationCosts, DEFAULT_ORIGIN } from '../lib/destinationCosts.js';
 import { getAuthor } from '../lib/authors.js';
 
 const SITE = 'https://mytripmoney.com';
@@ -47,19 +47,27 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
+// SSR has no client state, so we default to the US flight estimate here.
+// The interactive estimator on the homepage lets the user pick any of the
+// 12 origin countries, so the copy below tells them where to go for that.
+function defaultFlightUSD(dest) {
+  const fe = dest.flightEstimates || {};
+  return fe[DEFAULT_ORIGIN] ?? 0;
+}
+
 function buildIntro(dest) {
   const mid = dailyTotal(dest.midRange);
   const budget = dailyTotal(dest.budget);
   const lux = dailyTotal(dest.luxury);
   const weekMid = mid * 7;
   const p1 = `${dest.name} sits in a price band where mid-range travelers typically spend around ${fmtUSD(mid)} per day on the ground — about ${fmtUSD(weekMid)} for a full week before flights. Backpackers on a tight budget can get by on roughly ${fmtUSD(budget)} a day staying in hostels and eating at local spots, while luxury travelers booking 4–5 star hotels and fine dining should plan for closer to ${fmtUSD(lux)} per day.`;
-  const p2 = `International flights from a major US hub to ${dest.name} run roughly ${fmtUSD(dest.flightEstimateUSD)} round-trip in economy class, though shoulder-season and advance-purchase fares can land well below that. The estimator below adds flights, accommodation, food, local transport, and activities into a single number you can save and track during the trip.`;
+  const p2 = `International flights from a major US hub to ${dest.name} run roughly ${fmtUSD(defaultFlightUSD(dest))} round-trip in economy class, though shoulder-season and advance-purchase fares can land well below that. The estimator below adds flights, accommodation, food, local transport, and activities into a single number you can save and track during the trip — and lets you pick your own departing country.`;
   return { p1, p2 };
 }
 
 function buildQuickAnswer(dest) {
   const weekMid = dailyTotal(dest.midRange) * 7;
-  return `A 7-day mid-range trip to ${dest.name} costs approximately ${fmtUSD(weekMid)} per person, including accommodation, food, transport, and activities. Flights from the US add roughly ${fmtUSD(dest.flightEstimateUSD)}.`;
+  return `A 7-day mid-range trip to ${dest.name} costs approximately ${fmtUSD(weekMid)} per person, including accommodation, food, transport, and activities. Flights from the US add roughly ${fmtUSD(defaultFlightUSD(dest))} (use the estimator to see costs from other countries).`;
 }
 
 // Region-based seasonality hints for the "best time" FAQ. We don't pretend to
