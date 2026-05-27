@@ -1,4 +1,38 @@
 import { useState, useEffect } from "react";
+import Estimator from "./components/Estimator.jsx";
+import FAQSection from "./components/FAQSection.jsx";
+import { destinationCosts, POPULAR_SLUGS } from "../lib/destinationCosts.js";
+
+const ESTIMATOR_FAQS = [
+  {
+    question: "How accurate are MyTripMoney's travel budget estimates?",
+    answer: "Our estimates are based on 2026 average traveler spending data across accommodation, food, local transport, and activities for each destination. Budget tier reflects hostels, street food, and public transit. Mid-range reflects 3-star hotels, restaurant meals, and a mix of taxis and transit. Luxury reflects 4 to 5-star hotels, fine dining, and private transport. Actual costs vary by season, exchange rates, and personal style — most travelers come within 15 to 20 percent of the estimate.",
+  },
+  {
+    question: "Is the budget calculator free to use?",
+    answer: "Yes. The MyTripMoney budget calculator is completely free, no signup required. You can estimate trip costs for 40+ destinations instantly. Creating an account is only needed if you want to save your trip and track actual spending against your budget during travel.",
+  },
+  {
+    question: "How much does a one-week vacation cost on average?",
+    answer: "For a single traveler, a one-week vacation in 2026 typically costs between $700 and $1,400 in Southeast Asia (Bangkok, Bali, Hanoi), $1,500 to $2,800 in Latin America (Mexico City, Cartagena, Cusco), $2,200 to $3,800 in Western Europe (Paris, Rome, Barcelona), and $3,000 to $5,500 in expensive destinations (Tokyo, Reykjavik, Dubai). These ranges cover mid-range travel and exclude international flights.",
+  },
+  {
+    question: "What does the estimate include?",
+    answer: "The estimate includes daily accommodation, food, local transport (taxis, metro, buses, ride-shares), and typical tourist activities. A rough international flight estimate is shown separately. The estimate does not include travel insurance, visas, shopping, alcohol-heavy nightlife, or once-in-a-lifetime experiences like hot air balloons or private tours — budget an extra 10 to 20 percent for these.",
+  },
+  {
+    question: "How can I lower my travel budget without sacrificing the experience?",
+    answer: "Three changes cut most trip budgets by 20 to 30 percent: stay in apartments or boutique guesthouses instead of hotels, eat one restaurant meal per day instead of three, and use public transport plus walking instead of taxis. Booking flights 6 to 8 weeks in advance and traveling in shoulder season (April to May, September to October for most destinations) cuts another 15 to 25 percent.",
+  },
+  {
+    question: "Can I track my actual spending against the budget?",
+    answer: "Yes. After estimating your trip, you can save it to your MyTripMoney account and log expenses as you travel. The app shows your live spending versus the planned budget by category, so you can see whether you are on track, under, or over for accommodation, food, transport, and activities.",
+  },
+  {
+    question: "Does the calculator account for currency exchange rates?",
+    answer: "Yes. All cost data is sourced in USD and converted live to your home currency using mid-market exchange rates updated every 60 seconds. Note that the rate you actually receive at ATMs and on card transactions abroad is typically 1 to 3 percent worse than the mid-market rate — factor a small FX buffer into your real-world budget.",
+  },
+];
 
 const T = {
   bg: "#0A0F1E", surface: "#111827", card: "#1A2235",
@@ -57,16 +91,6 @@ export default function LandingPage({ onGetStarted, onLogin, onInstall, onGoPro,
     { name: "Priya & James", trip: "Europe Honeymoon", quote: "We split a 4-country trip with separate budgets per stop. Nothing else lets you do that." },
   ];
 
-  const faqs = [
-    { q: "Do I need to download anything?", a: "Nope. MyTripMoney is a web app that installs directly to your phone's home screen. No App Store, no Play Store. Open the link, tap 'Add to Home Screen', done." },
-    { q: "Does it work without internet?", a: "Yes. All your data saves locally on your device. You can log expenses on a plane, in the mountains, anywhere. It syncs when you're back online." },
-    { q: "Can I use it for multiple trips?", a: "Free accounts get 1 trip. Pro accounts get unlimited trips, multi-leg journeys, PDF reports, and all currencies." },
-    { q: "What currencies are supported?", a: "Over 100 currencies worldwide — from US Dollars to Haitian Gourdes to Japanese Yen. If your country has a currency, we support it." },
-    { q: "Can I cancel anytime?", a: "Yes. Cancel with one click. No contracts, no tricks. Your data stays yours." },
-  ];
-
-  const [openFaq, setOpenFaq] = useState(null);
-
   const Section = ({ children, style = {} }) => (
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 24px", ...style }}>{children}</div>
   );
@@ -118,106 +142,92 @@ export default function LandingPage({ onGetStarted, onLogin, onInstall, onGoPro,
         </Section>
       </nav>
 
-      {/* ─── HERO ─── */}
-      <section style={{ minHeight: "100vh", display: "flex", alignItems: "center", position: "relative", overflow: "hidden", paddingTop: 80 }}>
-        {/* Background glow */}
-        <div style={{ position: "absolute", top: "20%", left: "50%", transform: "translateX(-50%)", width: 600, height: 600, background: `radial-gradient(circle, ${T.accent}15 0%, transparent 70%)`, pointerEvents: "none" }} />
-        <div style={{ position: "absolute", top: "40%", right: "10%", width: 300, height: 300, background: `radial-gradient(circle, ${T.purple}10 0%, transparent 70%)`, pointerEvents: "none" }} />
+      {/* ─── HERO (estimator) ─── */}
+      <section style={{ minHeight: "100vh", display: "flex", alignItems: "center", position: "relative", overflow: "hidden", paddingTop: 100, paddingBottom: 60 }}>
+        <div style={{ position: "absolute", top: "10%", left: "50%", transform: "translateX(-50%)", width: 700, height: 700, background: `radial-gradient(circle, ${T.accent}15 0%, transparent 70%)`, pointerEvents: "none" }} />
+        <div style={{ position: "absolute", top: "50%", right: "5%", width: 320, height: 320, background: `radial-gradient(circle, ${T.purple}10 0%, transparent 70%)`, pointerEvents: "none" }} />
 
         <Section>
-          <div style={{ display: "flex", alignItems: "center", gap: 60, flexWrap: "wrap", justifyContent: "center" }}>
-            <div style={{ flex: "1 1 400px", maxWidth: 560 }}>
-              <div className="fade-up" style={{ display: "inline-block", background: T.accent + "15", border: `1px solid ${T.accent}33`, borderRadius: 99, padding: "6px 16px", marginBottom: 24 }}>
-                <span style={{ color: T.accent, fontSize: 13, fontWeight: 700 }}>✨ No download required — works on any phone</span>
-              </div>
-              <h1 className="fade-up fade-up-1" style={{ fontFamily: "Sora", fontSize: "clamp(36px, 5vw, 56px)", fontWeight: 900, lineHeight: 1.1, letterSpacing: -2, marginBottom: 20 }}>
-                Track every dollar.<br />
-                <span style={{ color: T.accent }}>Every currency.</span><br />
-                Every leg of your trip.
-              </h1>
-              <p className="fade-up fade-up-2" style={{ color: T.textMid, fontSize: 18, lineHeight: 1.6, marginBottom: 36, maxWidth: 460 }}>
-                The travel expense tracker that handles multi-leg journeys, 100+ currencies, and real-world travel chaos — all from your phone.
-              </p>
-              <div className="fade-up fade-up-3" style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
-                <button onClick={() => onGetStarted && onGetStarted()} className="cta-btn" style={{ background: T.accent, color: T.bg, border: "none", borderRadius: 14, padding: "16px 36px", fontSize: 17, fontWeight: 900, cursor: "pointer" }}>
-                  Start Free →
-                </button>
-                <a href="#features" style={{ display: "flex", alignItems: "center", gap: 8, color: T.textMid, textDecoration: "none", fontSize: 15, fontWeight: 600, padding: "16px 20px" }}>
-                  See Features ↓
-                </a>
-              </div>
-              <div className="fade-up fade-up-4" style={{ display: "flex", gap: 24, marginTop: 32, color: T.textDim, fontSize: 13 }}>
-                <span>✓ Free to start</span>
-                <span>✓ No app store needed</span>
-                <span>✓ Works offline</span>
-              </div>
+          <div style={{ textAlign: "center", maxWidth: 760, margin: "0 auto 36px" }}>
+            <div className="fade-up" style={{ display: "inline-block", background: T.accent + "15", border: `1px solid ${T.accent}33`, borderRadius: 99, padding: "6px 16px", marginBottom: 24 }}>
+              <span style={{ color: T.accent, fontSize: 13, fontWeight: 700 }}>✨ Free · 40+ destinations · No signup</span>
             </div>
+            <h1 className="fade-up fade-up-1" style={{ fontFamily: "Sora", fontSize: "clamp(34px, 5.5vw, 60px)", fontWeight: 900, lineHeight: 1.05, letterSpacing: -2, marginBottom: 18, color: T.text }}>
+              Plan your trip budget in <span style={{ color: T.accent }}>30 seconds.</span>
+            </h1>
+            <p className="fade-up fade-up-2" style={{ color: T.textMid, fontSize: 18, lineHeight: 1.55, maxWidth: 580, margin: "0 auto" }}>
+              Get a realistic cost estimate for any destination — then track your actual spending as you travel.
+            </p>
+          </div>
 
-            {/* Phone mockup */}
-            <div className="fade-up fade-up-3" style={{ flex: "0 0 280px", position: "relative", animation: "float 4s ease-in-out infinite" }}>
-              <div style={{
-                width: 280, height: 560, borderRadius: 36, overflow: "hidden",
-                background: T.surface, border: `3px solid ${T.border}`,
-                boxShadow: `0 40px 80px rgba(0,0,0,0.5), 0 0 60px ${T.accent}15`,
-                position: "relative",
-              }}>
-                {/* Status bar */}
-                <div style={{ height: 44, background: T.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <div style={{ width: 80, height: 24, borderRadius: 12, background: T.surface }} />
-                </div>
-                {/* App header */}
-                <div style={{ padding: "12px 16px", borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div style={{ display: "flex", gap: 3 }}><span style={{ fontSize: 14, fontWeight: 900, color: T.text }}>My</span><span style={{ fontSize: 14, fontWeight: 900, color: T.accent }}>Trip</span><span style={{ fontSize: 14, fontWeight: 900, color: T.text }}>Money</span></div>
-                  <span style={{ fontSize: 10, color: T.textDim }}>🇵🇷 Puerto Rico</span>
-                </div>
-                {/* Mock dashboard */}
-                <div style={{ padding: 12 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
-                    <div><div style={{ color: T.textDim, fontSize: 9, fontWeight: 600 }}>ACTIVE TRIP</div><div style={{ color: T.text, fontSize: 15, fontWeight: 900 }}>🇵🇷 Puerto Rico</div></div>
-                    <div style={{ width: 28, height: 28, borderRadius: 8, background: T.green + "22", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 900, color: T.green }}>A</div>
-                  </div>
-                  {/* Budget ring mock */}
-                  <div style={{ background: T.card, borderRadius: 14, padding: 14, display: "flex", alignItems: "center", gap: 14, marginBottom: 10, border: `1px solid ${T.border}` }}>
-                    <svg width={56} height={56} style={{ transform: "rotate(-90deg)" }}>
-                      <circle cx={28} cy={28} r={22} fill="none" stroke={T.border} strokeWidth={6} />
-                      <circle cx={28} cy={28} r={22} fill="none" stroke={T.green} strokeWidth={6} strokeDasharray={138} strokeDashoffset={42} strokeLinecap="round" />
-                      <text x={28} y={28} textAnchor="middle" dominantBaseline="middle" fill={T.green} fontSize={11} fontWeight={800} style={{ transform: "rotate(90deg)", transformOrigin: "28px 28px" }}>60%</text>
-                    </svg>
-                    <div>
-                      <div style={{ color: T.green, fontSize: 20, fontWeight: 900 }}>$1,510</div>
-                      <div style={{ color: T.textDim, fontSize: 10 }}>of $2,500 budget</div>
-                      <div style={{ color: T.green, fontSize: 10, fontWeight: 700, marginTop: 2 }}>$990 remaining</div>
-                    </div>
-                  </div>
-                  {/* Quick stats */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 10 }}>
-                    {[["Today", "$70", T.yellow], ["Avg/Day", "$251", T.accent]].map(([l, v, c]) => (
-                      <div key={l} style={{ background: T.card, borderRadius: 10, padding: 10, border: `1px solid ${T.border}` }}>
-                        <div style={{ color: T.textDim, fontSize: 8, fontWeight: 600 }}>{l}</div>
-                        <div style={{ color: c, fontSize: 16, fontWeight: 900 }}>{v}</div>
-                      </div>
-                    ))}
-                  </div>
-                  {/* Recent */}
-                  {[["✈️", "American Airlines", "$340"], ["🏨", "Airbnb 5 nights", "$620"], ["🍽️", "La Factoria", "$94"]].map(([icon, title, amt]) => (
-                    <div key={title} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderTop: `1px solid ${T.border}` }}>
-                      <div style={{ width: 28, height: 28, borderRadius: 8, background: T.card, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, border: `1px solid ${T.border}` }}>{icon}</div>
-                      <div style={{ flex: 1 }}><div style={{ color: T.text, fontSize: 11, fontWeight: 600 }}>{title}</div></div>
-                      <div style={{ color: T.text, fontSize: 12, fontWeight: 800 }}>{amt}</div>
-                    </div>
-                  ))}
-                </div>
-                {/* Bottom nav mock */}
-                <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: T.surface + "F0", borderTop: `1px solid ${T.border}`, display: "flex", padding: "8px 0 12px" }}>
-                  {["🏠", "📋", "💰", "📊"].map((icon, i) => (
-                    <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-                      <span style={{ fontSize: 16 }}>{icon}</span>
-                      {i === 0 && <div style={{ width: 16, height: 2, background: T.accent, borderRadius: 99 }} />}
-                    </div>
-                  ))}
-                </div>
-              </div>
+          <div className="fade-up fade-up-3">
+            <Estimator preselectSlug="paris" />
+          </div>
+        </Section>
+      </section>
+
+      {/* ─── EXPLAINER (3 paragraphs, GEO-friendly) ─── */}
+      <section style={{ padding: "70px 0", borderTop: `1px solid ${T.border}` }}>
+        <Section>
+          <div style={{ maxWidth: 760, margin: "0 auto" }}>
+            <h2 style={{ fontFamily: "Sora", fontSize: "clamp(24px, 3.5vw, 34px)", fontWeight: 900, letterSpacing: -0.8, marginBottom: 24, color: T.text, textAlign: "center" }}>
+              How the MyTripMoney estimator works
+            </h2>
+            <div style={{ color: T.textMid, fontSize: 16, lineHeight: 1.75, display: "flex", flexDirection: "column", gap: 18 }}>
+              <p>
+                The MyTripMoney travel budget calculator is a free tool that estimates the total cost of a trip across 40+ popular destinations worldwide — no signup required. Pick where you're going, how long you're staying, your travel style, and the number of travelers, and you get an instant breakdown of accommodation, food, local transport, and activity costs in your home currency.
+              </p>
+              <p>
+                All cost data is updated for <strong style={{ color: T.text }}>2026</strong> and grounded in real traveler spending averages from sources like Budget Your Trip and Numbeo. The estimator covers three travel styles — budget (hostels and street food), mid-range (3-star hotels and restaurant meals), and luxury (4–5 star hotels and fine dining) — so the number you see reflects how <em>you</em> actually travel, not a generic average. We convert costs to your home currency live using mid-market exchange rates from exchangerate.host.
+              </p>
+              <p>
+                Once you have a number you trust, save the trip and switch to tracking mode: log every expense as you spend, watch your live total against the budget by category, and know exactly when you're about to blow past your accommodation or food allowance. The estimator and the tracker are the same product — one front door for planning, one for executing.
+              </p>
             </div>
+          </div>
+        </Section>
+      </section>
+
+      {/* ─── POPULAR TRIP ESTIMATES (link grid for GEO/SEO) ─── */}
+      <section style={{ padding: "60px 0 100px", background: T.surface, borderTop: `1px solid ${T.border}`, borderBottom: `1px solid ${T.border}` }}>
+        <Section>
+          <div style={{ textAlign: "center", marginBottom: 40 }}>
+            <h2 style={{ fontFamily: "Sora", fontSize: "clamp(24px, 3.5vw, 34px)", fontWeight: 900, letterSpacing: -0.8, color: T.text, marginBottom: 10 }}>
+              Popular trip estimates
+            </h2>
+            <p style={{ color: T.textMid, fontSize: 15 }}>
+              Tap a destination for a 2026 budget guide and pre-filled estimator.
+            </p>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14, maxWidth: 980, margin: "0 auto" }}>
+            {POPULAR_SLUGS.map((slug) => {
+              const d = destinationCosts[slug];
+              if (!d) return null;
+              const tier = d.midRange;
+              const dailyUsd = tier.accommodation + tier.food + tier.transport + tier.activities;
+              const weekUsd = dailyUsd * 7;
+              return (
+                <a key={slug} href={`/trip/${slug}`} style={{
+                  display: "block",
+                  background: T.card,
+                  border: `1px solid ${T.border}`,
+                  borderRadius: 16,
+                  padding: "18px 18px 16px",
+                  textDecoration: "none",
+                  color: T.text,
+                  transition: "all 0.15s",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = T.accent + "66"; e.currentTarget.style.transform = "translateY(-2px)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.transform = "translateY(0)"; }}
+                >
+                  <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 4 }}>{d.name}</div>
+                  <div style={{ color: T.textMid, fontSize: 12, marginBottom: 10 }}>{d.country}</div>
+                  <div style={{ color: T.accent, fontSize: 14, fontWeight: 700 }}>
+                    ~${Math.round(weekUsd).toLocaleString()}<span style={{ color: T.textDim, fontWeight: 500 }}> · 7-day mid-range</span>
+                  </div>
+                </a>
+              );
+            })}
           </div>
         </Section>
       </section>
@@ -472,7 +482,7 @@ export default function LandingPage({ onGetStarted, onLogin, onInstall, onGoPro,
                 <span style={{ color: T.textDim, fontSize: 15 }}>.{annual ? "67" : "99"}/mo</span>
               </div>
               <div style={{ color: T.textMid, fontSize: 14, marginBottom: 28 }}>{annual ? "Billed $79.99/year" : "Billed monthly"}{annual ? " — save $40" : ""}</div>
-              <button onClick={() => (onGoPro ?? onGetStarted)?.()} style={{ width: "100%", background: T.accent, color: T.bg, border: "none", borderRadius: 14, padding: "14px", fontSize: 16, fontWeight: 900, cursor: "pointer", marginBottom: 28 }} className="cta-btn">Go Pro →</button>
+              <button onClick={() => onGoPro ? onGoPro(annual ? 'annual' : 'monthly') : onGetStarted?.()} style={{ width: "100%", background: T.accent, color: T.bg, border: "none", borderRadius: 14, padding: "14px", fontSize: 16, fontWeight: 900, cursor: "pointer", marginBottom: 28 }} className="cta-btn">Go Pro →</button>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {["Unlimited trips", "Multi-leg journeys", "100+ currencies", "PDF & email reports", "Cloud sync across devices", "Priority support", "Budget projections", "Trip health score", "All future features"].map(f => (
                   <div key={f} style={{ display: "flex", alignItems: "center", gap: 10, color: T.text, fontSize: 14 }}>
@@ -485,27 +495,8 @@ export default function LandingPage({ onGetStarted, onLogin, onInstall, onGoPro,
         </Section>
       </section>
 
-      {/* ─── FAQ ─── */}
-      <section style={{ padding: "80px 0", background: T.surface }}>
-        <Section>
-          <div style={{ textAlign: "center", marginBottom: 48 }}>
-            <h2 style={{ fontFamily: "Sora", fontSize: "clamp(28px, 4vw, 42px)", fontWeight: 900, letterSpacing: -1 }}>Questions?</h2>
-          </div>
-          <div style={{ maxWidth: 640, margin: "0 auto" }}>
-            {faqs.map((f, i) => (
-              <div key={i} style={{ borderBottom: `1px solid ${T.border}` }}>
-                <button onClick={() => setOpenFaq(openFaq === i ? null : i)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px 0", background: "none", border: "none", cursor: "pointer", color: T.text, fontSize: 16, fontWeight: 700, textAlign: "left" }}>
-                  {f.q}
-                  <span style={{ color: T.accent, fontSize: 20, transition: "transform 0.2s", transform: openFaq === i ? "rotate(45deg)" : "rotate(0)" }}>+</span>
-                </button>
-                {openFaq === i && (
-                  <div style={{ color: T.textMid, fontSize: 14, lineHeight: 1.7, paddingBottom: 20, paddingRight: 40 }}>{f.a}</div>
-                )}
-              </div>
-            ))}
-          </div>
-        </Section>
-      </section>
+      {/* ─── FAQ (FAQSection w/ JSON-LD schema for GEO/SEO) ─── */}
+      <FAQSection id="home-faq" title="Travel budget questions" faqs={ESTIMATOR_FAQS} />
 
       {/* ─── FOOTER ─── */}
       <footer style={{ padding: "40px 0", borderTop: `1px solid ${T.border}` }}>

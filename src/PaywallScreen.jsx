@@ -15,14 +15,28 @@ export function PaywallScreen({ feature, onBack, user }) {
     setLoading(true);
     setError('');
 
+    const billing = annual ? 'annual' : 'monthly';
+
+    // Logged-out visitor at /pricing: stash the intent + push through auth.
+    // The /checkout intent router picks it up on the post-auth bounce.
+    if (!user) {
+      try {
+        localStorage.setItem('pendingCheckout', JSON.stringify({
+          plan: 'pro', billing, createdAt: new Date().toISOString(),
+        }));
+      } catch { /* ignore */ }
+      window.location.assign('/auth?next=/checkout');
+      return;
+    }
+
     try {
       const res = await fetch('/api/create-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          plan: annual ? 'annual' : 'monthly',
-          userId: user?.id,
-          email: user?.email,
+          plan: billing,
+          userId: user.id,
+          email: user.email,
         }),
       });
 
@@ -33,7 +47,7 @@ export function PaywallScreen({ feature, onBack, user }) {
       } else {
         setError(data.error || 'Something went wrong. Please try again.');
       }
-    } catch (err) {
+    } catch {
       setError('Could not connect to payment server. Please try again.');
     }
 

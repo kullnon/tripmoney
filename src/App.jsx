@@ -7,13 +7,14 @@ import LandingPage from './LandingPage.jsx';
 import TripApp from './TripApp.jsx';
 import { useInstallPrompt, InstallModal } from './InstallPrompt.jsx';
 import AdminApp from './admin/AdminApp.jsx';
+import CheckoutScreen from './CheckoutScreen.jsx';
 
 const T = {
   bg: "#0A0F1E", accent: "#00D4FF", text: "#F0F4FF", textMid: "#8A9BC4", textDim: "#4A5880",
 };
 
-const PATH_TO_VIEW = { '/auth': 'auth', '/pricing': 'paywall', '/app': 'app' };
-const VIEW_TO_PATH = { landing: '/', auth: '/auth', paywall: '/pricing', app: '/app' };
+const PATH_TO_VIEW = { '/auth': 'auth', '/pricing': 'paywall', '/app': 'app', '/checkout': 'checkout' };
+const VIEW_TO_PATH = { landing: '/', auth: '/auth', paywall: '/pricing', app: '/app', checkout: '/checkout' };
 
 function LoadingScreen() {
   return (
@@ -55,6 +56,7 @@ export default function App() {
   useEffect(() => {
     if (loading) return;
     if (window.location.pathname.startsWith('/blog')) return;
+    if (window.location.pathname.startsWith('/trip/')) return;
     if (user) {
       const stored = sessionStorage.getItem('tm-redirect');
       if (stored) {
@@ -69,6 +71,13 @@ export default function App() {
         } catch {
           sessionStorage.removeItem('tm-redirect');
         }
+      }
+      // Honor ?next= on first post-auth tick so /pricing → /auth?next=/checkout
+      // lands the user on the checkout intent router instead of /app.
+      const next = new URLSearchParams(window.location.search).get('next');
+      if (next === '/checkout') {
+        setView('checkout');
+        return;
       }
       setView("app");
     }
@@ -94,7 +103,7 @@ export default function App() {
 
   // Sync view → URL (pushState so browser back button has history to traverse)
   useEffect(() => {
-    if (window.location.pathname.startsWith('/admin') || window.location.pathname.startsWith('/blog')) return;
+    if (window.location.pathname.startsWith('/admin') || window.location.pathname.startsWith('/blog') || window.location.pathname.startsWith('/trip/')) return;
     const newPath = VIEW_TO_PATH[view] || '/';
     if (window.location.pathname !== newPath) {
       window.history.pushState({ view }, '', newPath);
@@ -105,7 +114,7 @@ export default function App() {
   useEffect(() => {
     const onPop = () => {
       const path = window.location.pathname;
-      if (!path.startsWith('/admin') && !path.startsWith('/blog')) {
+      if (!path.startsWith('/admin') && !path.startsWith('/blog') && !path.startsWith('/trip/')) {
         setView(PATH_TO_VIEW[path] || 'landing');
       }
     };
@@ -122,6 +131,10 @@ export default function App() {
   if (window.location.pathname.startsWith('/blog')) {
     return null;
   }
+  // /trip/* destination pages: SSR'd by /api/trip-page — don't render SPA
+  if (window.location.pathname.startsWith('/trip/')) {
+    return null;
+  }
 
   if (loading || !minLoadDone) return <LoadingScreen />;
 
@@ -130,12 +143,51 @@ export default function App() {
     setView("landing");
   };
 
+  // Start Free handler — logged out: write a marker + send to auth so the
+  // post-auth redirect lands them in the tracker without going through Stripe.
+  const handleStartFree = () => {
+    if (user) { setView("app"); return; }
+    try { localStorage.setItem("pendingPlan", "free"); } catch { /* ignore */ }
+    window.location.assign("/auth?next=/app");
+  };
+
+  // Go Pro handler — billing comes from LandingPage's pricing toggle.
+  // Logged out: stash intent + bounce through auth to the /checkout router.
+  // Logged in: skip the paywall middleman and create the Stripe session directly.
+  const handleGoPro = async (billing) => {
+    const cycle = billing === 'monthly' ? 'monthly' : 'annual';
+    if (!user) {
+      try {
+        localStorage.setItem("pendingCheckout", JSON.stringify({
+          plan: "pro", billing: cycle, createdAt: new Date().toISOString(),
+        }));
+      } catch { /* ignore */ }
+      window.location.assign("/auth?next=/checkout");
+      return;
+    }
+    try {
+      const res = await fetch('/api/create-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: cycle, userId: user.id, email: user.email }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.assign(data.url);
+      } else {
+        alert(data.error || 'Could not start checkout. Please try again.');
+      }
+    } catch {
+      alert('Could not connect to payment server. Please try again.');
+    }
+  };
+
   const renderView = () => {
     if (view === "landing" && !user) {
       return <LandingPage
-        onGetStarted={() => setView("auth")}
+        onGetStarted={handleStartFree}
         onLogin={() => setView("auth")}
-        onGoPro={() => user ? setView("paywall") : setView("auth")}
+        onGoPro={handleGoPro}
         onInstall={() => setShowInstallModal(true)}
         canInstall={canInstall}
         isInstalled={isInstalled}
@@ -145,9 +197,10 @@ export default function App() {
       />;
     }
     if (view === "auth" && !user) return <AuthScreen onBack={() => setView("landing")} />;
-    if (view === "paywall") return <PaywallScreen feature={paywallFeature} onBack={() => setView("app")} user={user} />;
+    if (view === "checkout") return <CheckoutScreen />;
+    if (view === "paywall") return <PaywallScreen feature={paywallFeature} onBack={() => user ? setView("app") : setView("landing")} user={user} />;
     if (user) return <TripApp user={user} profile={profile} isPro={isPro} onSignOut={handleSignOut} onInstall={() => setShowInstallModal(true)} isInstalled={isInstalled} canInstall={canInstall} isIOS={isIOS} isMobile={/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)} onPaywall={(feature) => { setPaywallFeature(feature); setView("paywall"); }} />;
-    return <LandingPage onGetStarted={() => setView("auth")} onLogin={() => setView("auth")} />;
+    return <LandingPage onGetStarted={handleStartFree} onLogin={() => setView("auth")} onGoPro={handleGoPro} />;
   };
 
   // Global logout: show on every logged-in screen (TripApp's gear-icon logout can coexist)
