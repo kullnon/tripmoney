@@ -1,7 +1,10 @@
 import { useState, useEffect } from "react";
 import Estimator from "./components/Estimator.jsx";
 import FAQSection from "./components/FAQSection.jsx";
-import { destinationCosts, POPULAR_SLUGS } from "../lib/destinationCosts.js";
+import {
+  destinationCosts, POPULAR_SLUGS,
+  ORIGIN_CODES, DEFAULT_ORIGIN, originName, flightEstimateFor,
+} from "../lib/destinationCosts.js";
 
 const ESTIMATOR_FAQS = [
   {
@@ -45,6 +48,22 @@ export default function LandingPage({ onGetStarted, onLogin, onInstall, onGoPro,
   const [annual, setAnnual] = useState(true);
   const [scrollY, setScrollY] = useState(0);
   const [installing, setInstalling] = useState(false);
+
+  // Origin state lifted up so the Estimator AND the popular-trips grid share
+  // it: changing origin in the estimator should refresh the card totals.
+  // Same localStorage key the Estimator was previously reading directly.
+  const [origin, setOrigin] = useState(() => {
+    if (typeof window === "undefined") return DEFAULT_ORIGIN;
+    try {
+      const stored = localStorage.getItem("tripOrigin");
+      if (stored && ORIGIN_CODES.includes(stored)) return stored;
+    } catch { /* ignore */ }
+    return DEFAULT_ORIGIN;
+  });
+  const handleOriginChange = (next) => {
+    setOrigin(next);
+    try { localStorage.setItem("tripOrigin", next); } catch { /* ignore */ }
+  };
 
   const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
@@ -121,10 +140,12 @@ export default function LandingPage({ onGetStarted, onLogin, onInstall, onGoPro,
       {/* ─── NAV ─── */}
       <nav style={{
         position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
-        background: scrollY > 50 ? T.bg + "EE" : "transparent",
-        backdropFilter: scrollY > 50 ? "blur(16px)" : "none",
-        borderBottom: scrollY > 50 ? `1px solid ${T.border}` : "none",
-        transition: "all 0.3s",
+        // Solid bg always so content scrolling underneath is fully hidden by
+        // the fixed nav — previous semi-transparent EE (93%) let estimator
+        // cards and copy bleed through. Border-bottom appears on scroll only.
+        background: T.bg,
+        borderBottom: scrollY > 50 ? `1px solid ${T.border}` : "1px solid transparent",
+        transition: "border-color 0.3s",
         padding: "16px 0",
       }}>
         <Section style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -161,7 +182,7 @@ export default function LandingPage({ onGetStarted, onLogin, onInstall, onGoPro,
           </div>
 
           <div className="fade-up fade-up-3">
-            <Estimator preselectSlug="paris" />
+            <Estimator preselectSlug="paris" origin={origin} onOriginChange={handleOriginChange} />
           </div>
         </Section>
       </section>
@@ -195,8 +216,11 @@ export default function LandingPage({ onGetStarted, onLogin, onInstall, onGoPro,
             <h2 style={{ fontFamily: "Sora", fontSize: "clamp(24px, 3.5vw, 34px)", fontWeight: 900, letterSpacing: -0.8, color: T.text, marginBottom: 10 }}>
               Popular trip estimates
             </h2>
-            <p style={{ color: T.textMid, fontSize: 15 }}>
+            <p style={{ color: T.textMid, fontSize: 15, marginBottom: 6 }}>
               Tap a destination for a 2026 budget guide and pre-filled estimator.
+            </p>
+            <p style={{ color: T.accent, fontSize: 13, fontWeight: 700 }}>
+              Prices from {originName(origin)} · 7-day mid-range
             </p>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14, maxWidth: 980, margin: "0 auto" }}>
@@ -206,6 +230,11 @@ export default function LandingPage({ onGetStarted, onLogin, onInstall, onGoPro,
               const tier = d.midRange;
               const dailyUsd = tier.accommodation + tier.food + tier.transport + tier.activities;
               const weekUsd = dailyUsd * 7;
+              // Per-card total now includes the flight from the user's selected
+              // origin — same math as the main estimator's grand total at
+              // 7 days, 1 traveler, mid-range.
+              const flightUsd = flightEstimateFor(slug, origin);
+              const totalUsd = weekUsd + flightUsd;
               return (
                 <a key={slug} href={`/trip/${slug}`} style={{
                   display: "block",
@@ -223,7 +252,7 @@ export default function LandingPage({ onGetStarted, onLogin, onInstall, onGoPro,
                   <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 4 }}>{d.name}</div>
                   <div style={{ color: T.textMid, fontSize: 12, marginBottom: 10 }}>{d.country}</div>
                   <div style={{ color: T.accent, fontSize: 14, fontWeight: 700 }}>
-                    ~${Math.round(weekUsd).toLocaleString()}<span style={{ color: T.textDim, fontWeight: 500 }}> · 7-day mid-range</span>
+                    ~${Math.round(totalUsd).toLocaleString()}<span style={{ color: T.textDim, fontWeight: 500 }}> total · incl. flight</span>
                   </div>
                 </a>
               );

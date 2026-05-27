@@ -67,7 +67,15 @@ function fmtMoney(amount, code) {
   return `${sym}${n.toLocaleString("en-US")}`;
 }
 
-export default function Estimator({ preselectSlug = "paris", compact = false }) {
+export default function Estimator({
+  preselectSlug = "paris",
+  compact = false,
+  // Origin can be lifted to a parent so siblings (e.g. the popular-trips
+  // grid on the landing page) react to the same selection. If the parent
+  // doesn't pass it down, fall back to internal state + localStorage.
+  origin: controlledOrigin,
+  onOriginChange,
+}) {
   // Initial slug resolves (in priority order):
   //   1. ?destination=... URL param (set by SSR /trip/[dest] pages when CTA is clicked)
   //   2. preselectSlug prop
@@ -83,10 +91,9 @@ export default function Estimator({ preselectSlug = "paris", compact = false }) 
   const [travelers, setTravelers] = useState(1);
   const [homeCurrency, setHomeCurrency] = useState("USD");
   const [rate, setRate] = useState(1); // USD → homeCurrency multiplier
-  // Departing-from country — persisted to localStorage so returning users
-  // don't have to re-pick on every visit. Independent of home currency
-  // (a user in Mexico may still want to see costs in USD).
-  const [origin, setOrigin] = useState(() => {
+  // Standalone fallback: same localStorage read the parent does. Only used
+  // when the consumer hasn't lifted origin up.
+  const [uncontrolledOrigin, setUncontrolledOrigin] = useState(() => {
     if (typeof window === "undefined") return DEFAULT_ORIGIN;
     try {
       const stored = localStorage.getItem("tripOrigin");
@@ -94,6 +101,15 @@ export default function Estimator({ preselectSlug = "paris", compact = false }) 
     } catch { /* ignore */ }
     return DEFAULT_ORIGIN;
   });
+  const origin = controlledOrigin ?? uncontrolledOrigin;
+  const setOrigin = (next) => {
+    if (onOriginChange) {
+      onOriginChange(next);
+    } else {
+      setUncontrolledOrigin(next);
+      try { localStorage.setItem("tripOrigin", next); } catch { /* ignore */ }
+    }
+  };
 
   const destinations = useMemo(() => destinationList(), []);
   const dest = destinationCosts[slug];
@@ -174,11 +190,7 @@ export default function Estimator({ preselectSlug = "paris", compact = false }) 
         <Label>Departing from</Label>
         <select
           value={origin}
-          onChange={(e) => {
-            const next = e.target.value;
-            setOrigin(next);
-            try { localStorage.setItem("tripOrigin", next); } catch { /* ignore */ }
-          }}
+          onChange={(e) => setOrigin(e.target.value)}
           style={{ ...inputBase, appearance: "auto", marginBottom: 14 }}
         >
           {ORIGINS.map((o) => (
@@ -261,7 +273,7 @@ export default function Estimator({ preselectSlug = "paris", compact = false }) 
         <select
           value={homeCurrency}
           onChange={(e) => setHomeCurrency(e.target.value)}
-          style={{ ...inputBase, appearance: "auto", marginBottom: 8 }}
+          style={{ ...inputBase, appearance: "auto", marginBottom: 14 }}
         >
           {HOME_CURRENCIES.map((c) => (
             <option key={c.code} value={c.code}>{c.code} — {c.name}</option>
