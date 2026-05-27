@@ -18,8 +18,9 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-// Blog routes are server-rendered HTML — don't mount React over them
-if (!window.location.pathname.startsWith('/blog')) {
+// Blog and /trip/* routes are server-rendered HTML — don't mount React over them
+const _ssrPath = window.location.pathname;
+if (!_ssrPath.startsWith('/blog') && !_ssrPath.startsWith('/trip/')) {
   ReactDOM.createRoot(document.getElementById('root')).render(
     <React.StrictMode>
       <AuthProvider>

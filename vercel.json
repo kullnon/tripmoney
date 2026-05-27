@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/trip/:destination",
+      "destination": "/api/trip-page?slug=:destination"
+    },
+    {
       "source": "/((?!sitemap\\.xml|robots\\.txt|api/.*|.*\\..*).*)",
       "destination": "/index.html"
     }

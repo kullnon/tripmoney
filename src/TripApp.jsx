@@ -445,9 +445,19 @@ function WelcomeScreen({ onStart, onCreateTrip, onInstall, isInstalled, canInsta
 }
 
 // ─── CREATE TRIP ──────────────────────────────────────────────────
-function CreateTripScreen({ onSave, onBack, isPro, onPaywall }) {
-  const [tripType, setTripType] = useState(null); // null, "single", "multi"
-  const [form, setForm] = useState({ name: "", destination: "", country: "", departureDate: "", returnDate: "", budget: "", currency: "USD" });
+function CreateTripScreen({ onSave, onBack, isPro, onPaywall, prefill = null }) {
+  // Estimator handoff: skip the type chooser, pre-fill the single-trip form.
+  // Dates stay blank — user must confirm them before saving (spec: don't auto-create).
+  const [tripType, setTripType] = useState(prefill ? "single" : null);
+  const [form, setForm] = useState(() => prefill ? {
+    name: `${prefill.destination || ""} ${new Date().getFullYear()}`.trim(),
+    destination: prefill.destination || "",
+    country: prefill.countryCode || "",
+    departureDate: "",
+    returnDate: "",
+    budget: prefill.budget ? String(prefill.budget) : "",
+    currency: prefill.currency || "USD",
+  } : { name: "", destination: "", country: "", departureDate: "", returnDate: "", budget: "", currency: "USD" });
   const [legs, setLegs] = useState([{ id: 1, from: "", to: "", country: "", departureDate: "", returnDate: "", budget: "", currency: "USD" }]);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -506,9 +516,16 @@ function CreateTripScreen({ onSave, onBack, isPro, onPaywall }) {
     const ok = form.name && form.destination && form.country && form.departureDate && form.returnDate && form.budget;
     return (
       <div style={{ minHeight: "100vh", padding: "40px 20px 60px" }}>
-        <BackButton onClick={() => setTripType(null)} label="Back" />
-        <div style={{ fontSize: 28, fontWeight: 900, color: T.text, marginBottom: 6 }}>📍 Single Trip</div>
-        <div style={{ color: T.textMid, fontSize: 14, marginBottom: 30 }}>One destination, one budget.</div>
+        {(prefill ? onBack : true) && <BackButton onClick={prefill ? onBack : () => setTripType(null)} label="Back" />}
+        <div style={{ fontSize: 28, fontWeight: 900, color: T.text, marginBottom: 6 }}>📍 {prefill ? "Confirm your trip" : "Single Trip"}</div>
+        <div style={{ color: T.textMid, fontSize: 14, marginBottom: prefill ? 16 : 30 }}>
+          {prefill ? "We pre-filled your estimate. Add your travel dates to start tracking." : "One destination, one budget."}
+        </div>
+        {prefill && (
+          <div style={{ background: T.accent + "15", border: `1px solid ${T.accent}44`, borderRadius: 12, padding: "10px 14px", marginBottom: 22, color: T.accent, fontSize: 13, fontWeight: 600 }}>
+            ✨ From your estimate: {prefill.destination} · {prefill.days}d · {prefill.travelers > 1 ? `${prefill.travelers} travelers · ` : ""}{prefill.style === "midRange" ? "Mid-range" : prefill.style === "luxury" ? "Luxury" : "Budget"}
+          </div>
+        )}
         <InputRow label="Trip Name"><input value={form.name} onChange={e => set("name", e.target.value)} placeholder="e.g. Puerto Rico 2025" style={inputStyle} /></InputRow>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <InputRow label="Destination"><input value={form.destination} onChange={e => set("destination", e.target.value)} placeholder="e.g. San Juan" style={inputStyle} /></InputRow>
@@ -1255,10 +1272,25 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
   // CLOUD SYNC: Load trip + expenses from Supabase
   const [tripDbId, setTripDbId] = useState(null);
   const [syncing, setSyncing] = useState(false);
+  // Pre-trip estimator handoff: estimator stores `pendingTrip` in localStorage,
+  // we hydrate the new-trip form once when the user lands authenticated.
+  const [pendingPrefill, setPendingPrefill] = useState(null);
 
   useEffect(() => {
     if (!user?.id) return;
     let cancelled = false;
+    // Grab + clear the handoff before any async work so a refresh mid-flight
+    // doesn't re-fire it. Held in component state for the form to consume.
+    let prefill = null;
+    try {
+      const raw = localStorage.getItem("pendingTrip");
+      if (raw) {
+        prefill = JSON.parse(raw);
+        localStorage.removeItem("pendingTrip");
+      }
+    } catch (_) { /* ignore parse / storage errors */ }
+    if (prefill) setPendingPrefill(prefill);
+
     (async () => {
       try {
         const trips = await fetchTrips(user.id);
@@ -1270,11 +1302,24 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
           const exps = await fetchExpenses(latest.dbId);
           if (cancelled) return;
           setExpenses(exps);
-          setScreenRaw("dashboard");
-          screenHistory.current = ["dashboard"];
+          // If estimator handed off a prefill, jump straight to the new-trip
+          // form even when the user already has trips on file.
+          if (prefill) {
+            setScreenRaw("create-trip");
+            screenHistory.current = ["create-trip"];
+          } else {
+            setScreenRaw("dashboard");
+            screenHistory.current = ["dashboard"];
+          }
         } else {
-          setScreenRaw("welcome");
-          screenHistory.current = ["welcome"];
+          // First-time user: skip the welcome splash if estimator handed off
+          if (prefill) {
+            setScreenRaw("create-trip");
+            screenHistory.current = ["create-trip"];
+          } else {
+            setScreenRaw("welcome");
+            screenHistory.current = ["welcome"];
+          }
         }
       } catch (err) {
         console.error("Load failed:", err);
@@ -1383,7 +1428,7 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
       )}
       <div>
         {screen === "welcome" && <WelcomeScreen onStart={() => { setTrip(DEFAULT_TRIP); setExpenses(SEED_EXPENSES); setScreen("dashboard"); }} onCreateTrip={() => setScreen("create-trip")} onInstall={onInstall} isInstalled={isInstalled} canInstall={canInstall} isIOS={isIOS} isMobile={isMobile} isPro={isPro} onPaywall={onPaywall} user={user} />}
-        {screen === "create-trip" && <CreateTripScreen onSave={t => { setTrip(t); setExpenses([]); setScreen("dashboard"); }} onBack={trip && trip.name && expenses.length >= 0 ? () => setScreen("dashboard") : null} isPro={isPro} onPaywall={onPaywall} />}
+        {screen === "create-trip" && <CreateTripScreen onSave={t => { setTrip(t); setExpenses([]); setPendingPrefill(null); setScreen("dashboard"); }} onBack={trip && trip.name && expenses.length >= 0 ? () => { setPendingPrefill(null); setScreen("dashboard"); } : null} isPro={isPro} onPaywall={onPaywall} prefill={pendingPrefill} />}
         {screen === "dashboard" && <DashboardScreen expenses={expenses} trip={trip} setScreen={setScreen} setSelectedExpense={setSelectedExpense} />}
         {screen === "history" && <HistoryScreen expenses={expenses} trip={trip} setScreen={setScreen} setSelectedExpense={setSelectedExpense} />}
         {screen === "add" && <AddExpenseScreen onSave={addExpense} onBack={() => setScreen("dashboard")} trip={trip} />}
