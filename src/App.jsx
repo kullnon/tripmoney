@@ -136,8 +136,6 @@ export default function App() {
     return null;
   }
 
-  if (loading || !minLoadDone) return <LoadingScreen />;
-
   const handleSignOut = async () => {
     await signOut();
     setView("landing");
@@ -197,8 +195,15 @@ export default function App() {
       />;
     }
     if (view === "auth" && !user) return <AuthScreen onBack={() => setView("landing")} />;
-    if (view === "checkout") return <CheckoutScreen />;
     if (view === "paywall") return <PaywallScreen feature={paywallFeature} onBack={() => user ? setView("app") : setView("landing")} user={user} />;
+    // CheckoutScreen handles its own auth wait (useAuth().loading) and
+    // bounces to /auth?next=/checkout if unauthenticated, so it must render
+    // without sitting behind the global splash.
+    if (view === "checkout") return <CheckoutScreen />;
+    // Protected views past this point need the user record + min splash time.
+    // Public views above (landing/auth/paywall/checkout) render immediately
+    // so the marketing surfaces aren't held back by the Supabase session check.
+    if (loading || !minLoadDone) return <LoadingScreen />;
     if (user) return <TripApp user={user} profile={profile} isPro={isPro} onSignOut={handleSignOut} onInstall={() => setShowInstallModal(true)} isInstalled={isInstalled} canInstall={canInstall} isIOS={isIOS} isMobile={/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)} onPaywall={(feature) => { setPaywallFeature(feature); setView("paywall"); }} />;
     return <LandingPage onGetStarted={handleStartFree} onLogin={() => setView("auth")} onGoPro={handleGoPro} />;
   };
