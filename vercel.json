@@ -5,6 +5,14 @@
       "destination": "/api/trip-page?slug=:destination"
     },
     {
+      "source": "/guides",
+      "destination": "/api/guide-page"
+    },
+    {
+      "source": "/guides/:slug",
+      "destination": "/api/guide-page?slug=:slug"
+    },
+    {
       "source": "/((?!sitemap\\.xml|robots\\.txt|api/.*|.*\\..*).*)",
       "destination": "/index.html"
     }

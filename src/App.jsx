@@ -57,6 +57,7 @@ export default function App() {
     if (loading) return;
     if (window.location.pathname.startsWith('/blog')) return;
     if (window.location.pathname.startsWith('/trip/')) return;
+    if (window.location.pathname === '/guides' || window.location.pathname.startsWith('/guides/')) return;
     if (user) {
       const stored = sessionStorage.getItem('tm-redirect');
       if (stored) {
@@ -103,7 +104,8 @@ export default function App() {
 
   // Sync view → URL (pushState so browser back button has history to traverse)
   useEffect(() => {
-    if (window.location.pathname.startsWith('/admin') || window.location.pathname.startsWith('/blog') || window.location.pathname.startsWith('/trip/')) return;
+    const p = window.location.pathname;
+    if (p.startsWith('/admin') || p.startsWith('/blog') || p.startsWith('/trip/') || p === '/guides' || p.startsWith('/guides/')) return;
     const newPath = VIEW_TO_PATH[view] || '/';
     if (window.location.pathname !== newPath) {
       window.history.pushState({ view }, '', newPath);
@@ -114,7 +116,7 @@ export default function App() {
   useEffect(() => {
     const onPop = () => {
       const path = window.location.pathname;
-      if (!path.startsWith('/admin') && !path.startsWith('/blog') && !path.startsWith('/trip/')) {
+      if (!path.startsWith('/admin') && !path.startsWith('/blog') && !path.startsWith('/trip/') && path !== '/guides' && !path.startsWith('/guides/')) {
         setView(PATH_TO_VIEW[path] || 'landing');
       }
     };
@@ -133,6 +135,10 @@ export default function App() {
   }
   // /trip/* destination pages: SSR'd by /api/trip-page — don't render SPA
   if (window.location.pathname.startsWith('/trip/')) {
+    return null;
+  }
+  // /guides and /guides/* pages: SSR'd by /api/guide-page — don't render SPA
+  if (window.location.pathname === '/guides' || window.location.pathname.startsWith('/guides/')) {
     return null;
   }
 

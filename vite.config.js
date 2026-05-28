@@ -9,11 +9,11 @@ export default defineConfig({
       registerType: 'autoUpdate',
       workbox: {
         // SSR'd routes must bypass the SPA-shell navigation fallback. Without
-        // this denylist the SW intercepts top-level navigations to /trip/*
-        // and /blog/* and serves the precached index.html, leaving the user
-        // on a blank dark page because main.jsx deliberately skips mounting
-        // React on those paths.
-        navigateFallbackDenylist: [/^\/trip\//, /^\/blog\//, /^\/api\//],
+        // this denylist the SW intercepts top-level navigations to /trip/*,
+        // /blog/*, and /guides[/*] and serves the precached index.html,
+        // leaving the user on a blank dark page because main.jsx deliberately
+        // skips mounting React on those paths.
+        navigateFallbackDenylist: [/^\/trip\//, /^\/blog\//, /^\/guides(\/|$)/, /^\/api\//],
       },
       manifest: {
         name: 'MyTripMoney — Track Every Dollar',

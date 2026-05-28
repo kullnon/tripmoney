@@ -18,9 +18,13 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-// Blog and /trip/* routes are server-rendered HTML — don't mount React over them
+// Blog, /trip/*, and /guides routes are server-rendered HTML — don't mount React over them
 const _ssrPath = window.location.pathname;
-if (!_ssrPath.startsWith('/blog') && !_ssrPath.startsWith('/trip/')) {
+const _isSsrPath = _ssrPath.startsWith('/blog')
+  || _ssrPath.startsWith('/trip/')
+  || _ssrPath === '/guides'
+  || _ssrPath.startsWith('/guides/');
+if (!_isSsrPath) {
   ReactDOM.createRoot(document.getElementById('root')).render(
     <React.StrictMode>
       <AuthProvider>

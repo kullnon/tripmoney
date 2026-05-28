@@ -1,6 +1,7 @@
 User-agent: *
 Allow: /
 Allow: /trip/
+Allow: /guides/
 Disallow: /app
 Disallow: /admin
 Disallow: /auth
