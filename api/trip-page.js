@@ -267,7 +267,6 @@ function renderTripPage(slug, dest) {
     .crumbs a { color:#8A9BC4; text-decoration:none; }
     h1.page-title { font-family:Sora,sans-serif; font-size:clamp(28px,4.5vw,44px); font-weight:900; letter-spacing:-1.2px; line-height:1.1; margin-bottom:18px; color:#F0F4FF; }
     .byline { display:flex; gap:12px; align-items:center; margin-bottom:24px; padding-bottom:20px; border-bottom:1px solid #1E2D45; }
-    .avatar { width:40px; height:40px; border-radius:50%; background:#1A2235; border:1px solid #1E2D45; object-fit:cover; display:block; }
     .by-name { font-weight:700; color:#F0F4FF; font-size:14px; }
     .by-name a { color:#00D4FF; text-decoration:none; }
     .by-role { color:#8A9BC4; font-size:12px; }
@@ -324,7 +323,6 @@ function renderTripPage(slug, dest) {
       <div class="crumbs"><a href="/">← Back to budget calculator</a></div>
       <h1 class="page-title">How much does a trip to ${esc(dest.name)} cost in 2026?</h1>
       <div class="byline">
-        <img class="avatar" src="${esc(author.image)}" alt="${esc(author.name)}" onerror="this.style.display='none'">
         <div>
           <div class="by-name"><a href="/">${esc(author.name)}</a></div>
           <div class="by-role">${esc(author.role)}</div>
