@@ -302,6 +302,8 @@ function renderTripPage(slug, dest) {
     @media (max-width:600px) {
       .tier-grid { grid-template-columns:1fr; }
       .nav-links { gap:14px; }
+      .nav-link { font-size:13px; }
+      .nav .btn { display:none; }
     }
   </style>
 </head>
@@ -310,6 +312,7 @@ function renderTripPage(slug, dest) {
     <div class="container nav-row">
       <a href="/" class="logo"><span>My</span><span class="accent">Trip</span><span>Money</span></a>
       <div class="nav-links">
+        <a href="/guides" class="nav-link">Guides</a>
         <a href="/#pricing" class="nav-link">Pricing</a>
         <a href="https://blog.mytripmoney.com" class="nav-link">Blog</a>
         <a href="/auth?next=/app" class="btn">Get Started</a>
@@ -355,7 +358,7 @@ function renderTripPage(slug, dest) {
     </div>
   </main>
   <footer class="footer">
-    <div class="container">© 2026 MyTripMoney · <a href="/">Budget calculator</a> · <a href="/#pricing">Pricing</a> · <a href="https://blog.mytripmoney.com">Blog</a></div>
+    <div class="container">© 2026 MyTripMoney · <a href="/">Budget calculator</a> · <a href="/guides">Guides</a> · <a href="/#pricing">Pricing</a> · <a href="https://blog.mytripmoney.com">Blog</a></div>
   </footer>
 </body>
 </html>`;

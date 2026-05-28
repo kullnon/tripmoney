@@ -121,6 +121,8 @@ function sharedCSS() {
     .footer a:hover { color:#00D4FF; }
     @media (max-width:600px) {
       .nav-links { gap:14px; }
+      .nav-link { font-size:13px; }
+      .nav .btn { display:none; }
     }
   `;
 }
