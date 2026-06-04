@@ -105,16 +105,17 @@ function footerHTML() {
 function renderMarcusChen() {
   const author = getAuthor('marcus-chen');
   const url = `${SITE}/about/marcus-chen`;
-  const title = 'Marcus Chen — Travel Cost Writer | MyTripMoney';
-  const description = 'Travel cost writer at MyTripMoney covering destination cost breakdowns, currency-aware budgeting, and practical trip-cost planning across 40+ destinations.';
+  const title = 'Marcus Chen — Travel Finance Editor | MyTripMoney';
+  const description = 'Travel finance editor at MyTripMoney covering destination cost breakdowns, currency-aware budgeting, and practical trip-cost planning across 40+ destinations.';
 
-  // Person JSON-LD — injected verbatim per spec. No sameAs/social links (none exist).
+  // Person JSON-LD. jobTitle matches the site-wide author role in lib/authors.js.
+  // No sameAs/social links (none exist).
   const personLd = {
     '@context': 'https://schema.org',
     '@type': 'Person',
     name: 'Marcus Chen',
-    jobTitle: 'Travel Cost Writer',
-    description: 'Travel cost writer at MyTripMoney covering destination cost breakdowns, currency-aware budgeting, and practical trip-cost planning across 40+ destinations.',
+    jobTitle: 'Travel Finance Editor',
+    description: 'Travel finance editor at MyTripMoney covering destination cost breakdowns, currency-aware budgeting, and practical trip-cost planning across 40+ destinations.',
     url: `${SITE}/about/marcus-chen`,
     worksFor: { '@type': 'Organization', name: 'MyTripMoney', url: SITE },
     knowsAbout: ['Travel budgeting', 'Trip cost estimation', 'Currency conversion', 'Budget travel planning'],
@@ -145,7 +146,7 @@ ${sharedHead({ title, description, url, jsonLd: [personLd, breadcrumbLd] })}
   <main>
     <div class="container">
       <div class="crumbs"><a href="/">Home</a> › About › Marcus Chen</div>
-      <h1 class="page-title">Marcus Chen — Travel Cost Writer, MyTripMoney</h1>
+      <h1 class="page-title">Marcus Chen — Travel Finance Editor, MyTripMoney</h1>
       <div class="by-role">${esc(author.role)}</div>
 
       <div class="intro">
