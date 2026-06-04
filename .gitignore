@@ -26,3 +26,5 @@ tropicatlas-editor-*.json
 *.service-account.json
 .vercel
 .env*.local
+service-account.json
+.env*
