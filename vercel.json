@@ -13,6 +13,10 @@
       "destination": "/api/guide-page?slug=:slug"
     },
     {
+      "source": "/about/marcus-chen",
+      "destination": "/api/about-page"
+    },
+    {
       "source": "/((?!sitemap\\.xml|robots\\.txt|api/.*|.*\\..*).*)",
       "destination": "/index.html"
     }
