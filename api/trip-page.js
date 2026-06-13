@@ -9,7 +9,7 @@
 import { destinationCosts, DEFAULT_ORIGIN } from '../lib/destinationCosts.js';
 import { getAuthor } from '../lib/authors.js';
 
-const SITE = 'https://mytripmoney.com';
+const SITE = 'https://www.mytripmoney.com';
 
 export default function handler(req, res) {
   const slug = (req.query?.slug || req.query?.destination || '')

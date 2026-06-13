@@ -50,7 +50,7 @@ function unsubPage(message, success) {
     <p style="font-size:0.9rem;color:#8A9BC4;margin:0 0 24px;">
       ${success ? "You won't receive any more emails from us." : 'Please email andrelubin@gmail.com if you need help.'}
     </p>
-    <a href="https://mytripmoney.com" style="display:inline-block;background:#00D4FF;color:#0A0F1E;padding:10px 24px;border-radius:10px;font-size:0.9rem;font-weight:800;text-decoration:none;">
+    <a href="https://www.mytripmoney.com" style="display:inline-block;background:#00D4FF;color:#0A0F1E;padding:10px 24px;border-radius:10px;font-size:0.9rem;font-weight:800;text-decoration:none;">
       Back to MyTripMoney
     </a>
   </div>

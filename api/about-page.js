@@ -10,7 +10,7 @@
 
 import { getAuthor } from '../lib/authors.js';
 
-const SITE = 'https://mytripmoney.com';
+const SITE = 'https://www.mytripmoney.com';
 
 export default function handler(req, res) {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');

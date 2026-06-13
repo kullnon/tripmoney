@@ -210,7 +210,7 @@ async function sendDailyEmail(d, gscError) {
       <table style="width:100%; border-collapse: collapse; margin: 8px 0 16px;">
         <tr><td style="padding: 6px 0; color:#666; width: 130px;">Decision</td><td style="padding: 6px 0; font-weight:600;">${labelByType[d.decision_type]}</td></tr>
         ${d.target_keyword ? `<tr><td style="padding: 6px 0; color:#666;">Keyword</td><td style="padding: 6px 0; font-weight:600;">${escape(d.target_keyword)}</td></tr>` : ''}
-        ${d.target_post_slug ? `<tr><td style="padding: 6px 0; color:#666;">Post</td><td style="padding: 6px 0;"><a href="https://mytripmoney.com/blog/${escape(d.target_post_slug)}">/blog/${escape(d.target_post_slug)}</a></td></tr>` : ''}
+        ${d.target_post_slug ? `<tr><td style="padding: 6px 0; color:#666;">Post</td><td style="padding: 6px 0;"><a href="https://www.mytripmoney.com/blog/${escape(d.target_post_slug)}">/blog/${escape(d.target_post_slug)}</a></td></tr>` : ''}
         <tr><td style="padding: 6px 0; color:#666;">Urgency</td><td style="padding: 6px 0;">${d.urgency_score}/10</td></tr>
       </table>
 

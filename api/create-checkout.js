@@ -22,7 +22,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Missing userId or email.' });
     }
 
-    const origin = req.headers.origin || 'https://mytripmoney.com';
+    const origin = req.headers.origin || 'https://www.mytripmoney.com';
 
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',

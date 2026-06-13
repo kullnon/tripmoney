@@ -11,7 +11,7 @@
 import { guides, guideSlugs, getGuide, relatedGuides } from '../lib/guides.js';
 import { getAuthor } from '../lib/authors.js';
 
-const SITE = 'https://mytripmoney.com';
+const SITE = 'https://www.mytripmoney.com';
 
 export default function handler(req, res) {
   const rawSlug = (req.query?.slug || '').toString().toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 60);

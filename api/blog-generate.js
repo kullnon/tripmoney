@@ -103,7 +103,7 @@ ARTICLE REQUIREMENTS:
 - Include the target keyword 3-5 times naturally
 - Include real-world budget numbers, currency considerations, and concrete examples
 - Every post must include at least ONE section discussing how to track expenses across multiple currencies / multiple legs / multiple cards — this is MyTripMoney's wedge
-- End with a clear CTA: <p><strong>Stop guessing what you're spending abroad.</strong> MyTripMoney tracks every dollar across every currency and every leg of your trip — automatically. <a href="https://mytripmoney.com/auth">Start free →</a></p>
+- End with a clear CTA: <p><strong>Stop guessing what you're spending abroad.</strong> MyTripMoney tracks every dollar across every currency and every leg of your trip — automatically. <a href="https://www.mytripmoney.com/auth">Start free →</a></p>
 - Tone: conversational, authoritative, friend-who-travels-a-lot — never preachy about money
 - Add internal link to /pricing at least once where natural
 - Use 2026 when referencing the current year
@@ -191,7 +191,7 @@ ARTICLE REQUIREMENTS:
       keyword,
       author,
       decision_source: decisionSource,
-      url: `https://mytripmoney.com/blog/${slug}`,
+      url: `https://www.mytripmoney.com/blog/${slug}`,
     });
   } catch (e) {
     console.error('Blog generate error:', e);
