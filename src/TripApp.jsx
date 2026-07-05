@@ -1279,12 +1279,15 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
   const [tripDbId, setTripDbId] = useState(null);
   const [syncing, setSyncing] = useState(false);
 
-  // VOICE-TO-EXPENSE: mic → Web Speech API → /api/parse-expense → pre-fill the add form.
-  // Never auto-saves; it only seeds the form so the user reviews and hits Save (which
-  // flows through the normal addExpense path + its user/tripDbId persistence guard).
+  // VOICE-TO-EXPENSE: mic → Web Speech API → /api/parse-expense.
+  // Happy path (confidence "high" + valid amount): auto-save straight through addExpense
+  // (optimistic local + user/tripDbId persistence guard), land on the dashboard, and offer a
+  // one-tap Undo toast. Uncertain parses (low confidence / bad amount) fall back to the
+  // pre-filled form for human review — that is the only path that opens the "add" screen.
   const [voiceState, setVoiceState] = useState("idle"); // 'idle' | 'listening' | 'parsing'
   const [voicePrefill, setVoicePrefill] = useState(null);
   const [voiceNote, setVoiceNote] = useState(null);
+  const [toast, setToast] = useState(null); // { title, amount, currency, voiceKey } | null
   const openManualAdd = (note = null) => { setVoicePrefill(null); setVoiceNote(note); setScreen("add"); };
   const startVoice = () => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -1307,10 +1310,35 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
         const resp = await fetch("/api/parse-expense", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ transcript, currency: trip.currency }) });
         const data = await resp.json();
         if (!resp.ok || data.error || data.amount == null) { setVoiceState("idle"); openManualAdd("Couldn't catch that — enter manually"); return; }
-        setVoiceNote(null);
-        setVoicePrefill({ amount: data.amount, category: data.category, title: data.title, confidence: data.confidence });
         setVoiceState("idle");
-        setScreen("add");
+        const amt = Number(data.amount);
+        const highConf = data.confidence === "high" && Number.isFinite(amt) && amt > 0;
+        if (highConf) {
+          // HAPPY PATH — build the expense with the same defaults Quick-Add/the form use,
+          // save it directly (no form), land on the dashboard, and show an Undo toast.
+          const todayStr = new Date().toISOString().slice(0, 10);
+          const voiceKey = uid();
+          const expense = {
+            id: uid(), _voiceKey: voiceKey,
+            title: data.title || catById(data.category).label,
+            amount: amt, category: data.category,
+            phase: autoPhase(todayStr, trip.departureDate, trip.returnDate),
+            date: todayStr, payment: "💳 Credit Card", status: "paid", planned: false,
+            notes: "", refundable: false, shared: false, sharedCount: 1, estimated: 0,
+            isDailySummary: false, originalAmount: amt, originalCurrency: trip.currency,
+            exchangeRate: 1, legId: autoLeg(todayStr, trip.legs),
+          };
+          setVoiceNote(null);
+          setVoicePrefill(null);
+          addExpense(expense);
+          setScreen("dashboard");
+          setToast({ title: expense.title, amount: amt, currency: trip.currency, voiceKey });
+        } else {
+          // FALLBACK — low confidence or bad amount: pre-fill the form for human review.
+          setVoiceNote(null);
+          setVoicePrefill({ amount: data.amount, category: data.category, title: data.title, confidence: data.confidence });
+          setScreen("add");
+        }
       } catch (err) {
         console.error("parse-expense request failed:", err);
         setVoiceState("idle");
@@ -1403,6 +1431,25 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
     return () => clearTimeout(timer);
   }, [trip, loaded, user?.id, tripDbId]);
 
+  // Mirror expenses into a ref so the Undo toast can find the auto-saved row by its stable
+  // _voiceKey even after addExpense has remapped its id to the Supabase id post-persist.
+  const expensesRef = useRef(expenses);
+  useEffect(() => { expensesRef.current = expenses; }, [expenses]);
+  // Auto-dismiss the confirmation toast after ~5s.
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 5000);
+    return () => clearTimeout(t);
+  }, [toast]);
+  const undoVoiceExpense = (voiceKey) => {
+    setToast(null);
+    const target = expensesRef.current.find(x => x._voiceKey === voiceKey);
+    setExpenses(p => p.filter(x => x._voiceKey !== voiceKey));
+    if (target?.dbId && user?.id) {
+      dbDeleteExpense(target.dbId).catch(err => console.error("undoVoiceExpense delete failed:", err));
+    }
+  };
+
   const addExpense = async (e) => {
     setExpenses(p => [...p, e]);
     if (!user?.id || !tripDbId) return;
@@ -1491,6 +1538,13 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
         {screen === "email-report" && <EmailReportScreen trip={trip} expenses={expenses} onBack={() => setScreen("reports")} />}
       </div>
       {showQuickAdd && <QuickAddSheet onSave={addExpense} onFullForm={() => { setVoicePrefill(null); setVoiceNote(null); setShowQuickAdd(false); setScreen("add"); }} onClose={() => setShowQuickAdd(false)} trip={trip} />}
+      {toast && (
+        <div style={{ position: "fixed", bottom: 90, left: "50%", transform: "translateX(-50%)", width: "calc(100% - 32px)", maxWidth: 358, zIndex: 300, background: T.surface, border: `1px solid ${T.green}66`, borderRadius: 14, padding: "12px 14px", display: "flex", alignItems: "center", gap: 10, boxShadow: "0 10px 40px rgba(0,0,0,0.5)" }}>
+          <div style={{ flex: 1, color: T.text, fontSize: 14, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Added {toast.title} {curByCode(toast.currency).symbol}{toast.amount} ✓</div>
+          <button onClick={() => undoVoiceExpense(toast.voiceKey)} style={{ background: "none", border: `1px solid ${T.accent}`, color: T.accent, borderRadius: 10, padding: "6px 12px", fontSize: 13, fontWeight: 800, cursor: "pointer", flexShrink: 0 }}>Undo</button>
+          <button onClick={() => setToast(null)} aria-label="Dismiss" style={{ background: "none", border: "none", color: T.textDim, fontSize: 20, cursor: "pointer", flexShrink: 0, lineHeight: 1, padding: 0 }}>×</button>
+        </div>
+      )}
       {isNav && !showQuickAdd && (
         <div style={{ position: "fixed", bottom: 88, right: "calc(50% - 195px + 16px)", display: "flex", flexDirection: "column", gap: 10, zIndex: 100, alignItems: "flex-end" }}>
           <style>{`@keyframes vpulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.08); opacity: 0.7; } }`}</style>
