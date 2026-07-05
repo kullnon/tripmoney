@@ -869,11 +869,15 @@ function ExpenseDetailScreen({ expense, trip, setScreen, onDelete, onDuplicate, 
 }
 
 // ─── ADD/EDIT EXPENSE ─────────────────────────────────────────────
-function AddExpenseScreen({ onSave, onBack, trip, editExpense = null }) {
+function AddExpenseScreen({ onSave, onBack, trip, editExpense = null, prefill = null, note = null }) {
   const isEdit = !!editExpense; const todayStr = new Date().toISOString().slice(0, 10); const tc = trip.currency;
+  // Voice pre-fill: seed amount/category/title from the parse; everything else uses the normal defaults.
+  const preAmount = (!isEdit && prefill && prefill.amount != null) ? String(prefill.amount) : "";
+  const lowConf = !isEdit && !!prefill && prefill.confidence === "low";
   const [form, setForm] = useState(editExpense ? { ...editExpense, amount: String(editExpense.amount), originalAmount: String(editExpense.originalAmount || editExpense.amount), exchangeRate: String(editExpense.exchangeRate || 1) } : {
-    title: "", amount: "", category: "food", phase: autoPhase(todayStr, trip.departureDate, trip.returnDate), date: todayStr, payment: "💳 Credit Card", status: "paid", planned: false, notes: "", refundable: false, shared: false, sharedCount: 2, estimated: "", isDailySummary: false, originalAmount: "", originalCurrency: tc, exchangeRate: "1", legId: autoLeg(todayStr, trip.legs),
+    title: prefill?.title || "", amount: preAmount, category: prefill?.category || "food", phase: autoPhase(todayStr, trip.departureDate, trip.returnDate), date: todayStr, payment: "💳 Credit Card", status: "paid", planned: false, notes: "", refundable: false, shared: false, sharedCount: 2, estimated: "", isDailySummary: false, originalAmount: preAmount, originalCurrency: tc, exchangeRate: "1", legId: autoLeg(todayStr, trip.legs),
   });
+  const flag = lowConf ? { boxShadow: `0 0 0 2px ${T.orange}88`, borderRadius: 14, padding: "8px 8px 2px", marginBottom: 8 } : undefined;
   const [saved, setSaved] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const useForeign = form.originalCurrency !== tc;
@@ -891,7 +895,9 @@ function AddExpenseScreen({ onSave, onBack, trip, editExpense = null }) {
       <BackButton onClick={onBack} />
       <div style={{ color: T.text, fontSize: 22, fontWeight: 900, marginBottom: 20 }}>{isEdit ? "Edit Expense" : "Add Expense"}</div>
       {saved && <div style={{ background: T.green + "22", border: `1px solid ${T.green}44`, borderRadius: 12, padding: 12, marginBottom: 16, color: T.green, fontWeight: 700, textAlign: "center" }}>✅ {isEdit ? "Updated!" : "Saved!"}</div>}
-      <InputRow label="Category"><div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>{CATEGORIES.map(c => <button key={c.id} onClick={() => set("category", c.id)} style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", padding: "10px 12px", borderRadius: 12, cursor: "pointer", background: form.category === c.id ? c.color + "33" : T.card, border: `2px solid ${form.category === c.id ? c.color : T.border}`, gap: 4 }}><span style={{ fontSize: 22 }}>{c.icon}</span><span style={{ fontSize: 9, fontWeight: 700, color: form.category === c.id ? c.color : T.textDim }}>{c.label.split(" ")[0]}</span></button>)}</div></InputRow>
+      {note && <div style={{ background: T.orange + "18", border: `1px solid ${T.orange}55`, borderRadius: 12, padding: 12, marginBottom: 16, color: T.orange, fontWeight: 700, fontSize: 13, textAlign: "center" }}>🎤 {note}</div>}
+      {!isEdit && prefill && !note && <div style={{ background: (lowConf ? T.orange : T.accent) + "18", border: `1px solid ${(lowConf ? T.orange : T.accent)}55`, borderRadius: 12, padding: 12, marginBottom: 16, color: lowConf ? T.orange : T.accent, fontWeight: 700, fontSize: 13, textAlign: "center" }}>{lowConf ? "🎤 Heard it — double-check the amount & category, then save." : "🎤 Pre-filled from voice — review and save."}</div>}
+      <div style={flag}><InputRow label="Category"><div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>{CATEGORIES.map(c => <button key={c.id} onClick={() => set("category", c.id)} style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", padding: "10px 12px", borderRadius: 12, cursor: "pointer", background: form.category === c.id ? c.color + "33" : T.card, border: `2px solid ${form.category === c.id ? c.color : T.border}`, gap: 4 }}><span style={{ fontSize: 22 }}>{c.icon}</span><span style={{ fontSize: 9, fontWeight: 700, color: form.category === c.id ? c.color : T.textDim }}>{c.label.split(" ")[0]}</span></button>)}</div></InputRow></div>
       <InputRow label="Expense Name"><input value={form.title} onChange={e => set("title", e.target.value)} placeholder={catById(form.category).label} style={inputStyle} /></InputRow>
 
       <InputRow label="Currency">
@@ -903,13 +909,13 @@ function AddExpenseScreen({ onSave, onBack, trip, editExpense = null }) {
         </div>
       </InputRow>
 
-      {useForeign ? (<>
+      <div style={flag}>{useForeign ? (<>
         <InputRow label={`Amount (${form.originalCurrency})`}><div style={{ position: "relative" }}><span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: T.purple, fontWeight: 700 }}>{curByCode(form.originalCurrency).symbol}</span><input value={form.originalAmount} onChange={e => handleForeignAmountChange(e.target.value)} type="number" placeholder="0.00" style={{ ...inputStyle, paddingLeft: 36 }} /></div></InputRow>
         <InputRow label={`Rate (1 ${form.originalCurrency} = ? ${tc})`}><input value={form.exchangeRate} onChange={e => handleRateChange(e.target.value)} type="number" step="0.0001" style={inputStyle} /></InputRow>
         {form.amount && <div style={{ color: T.accent, fontSize: 14, fontWeight: 700, marginBottom: 14, marginTop: -8 }}>≈ {fmtCur(form.amount, tc)}</div>}
       </>) : (
         <InputRow label={`Amount (${tc})`}><div style={{ position: "relative" }}><span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: T.textMid, fontWeight: 700 }}>{curByCode(tc).symbol}</span><input value={form.amount} onChange={e => { set("amount", e.target.value); set("originalAmount", e.target.value); }} type="number" placeholder="0.00" style={{ ...inputStyle, paddingLeft: 36 }} /></div></InputRow>
-      )}
+      )}</div>
       <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>{[10, 20, 50, 100, 200].map(n => <button key={n} onClick={() => { if (useForeign) handleForeignAmountChange(String(n)); else { set("amount", String(n)); set("originalAmount", String(n)); } }} style={{ padding: "8px 16px", background: T.card, border: `1px solid ${T.border}`, borderRadius: 99, color: T.textMid, fontSize: 13, cursor: "pointer", fontWeight: 600 }}>{useForeign ? curByCode(form.originalCurrency).symbol : curByCode(tc).symbol}{n}</button>)}</div>
 
       {trip.isMultiLeg && (
@@ -1272,6 +1278,49 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
   // CLOUD SYNC: Load trip + expenses from Supabase
   const [tripDbId, setTripDbId] = useState(null);
   const [syncing, setSyncing] = useState(false);
+
+  // VOICE-TO-EXPENSE: mic → Web Speech API → /api/parse-expense → pre-fill the add form.
+  // Never auto-saves; it only seeds the form so the user reviews and hits Save (which
+  // flows through the normal addExpense path + its user/tripDbId persistence guard).
+  const [voiceState, setVoiceState] = useState("idle"); // 'idle' | 'listening' | 'parsing'
+  const [voicePrefill, setVoicePrefill] = useState(null);
+  const [voiceNote, setVoiceNote] = useState(null);
+  const openManualAdd = (note = null) => { setVoicePrefill(null); setVoiceNote(note); setScreen("add"); };
+  const startVoice = () => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { openManualAdd("Couldn't catch that — enter manually"); return; }
+    let rec;
+    try { rec = new SR(); } catch { openManualAdd("Couldn't catch that — enter manually"); return; }
+    rec.lang = trip?.locale || "en-US";
+    rec.interimResults = false;
+    rec.maxAlternatives = 1;
+    rec.continuous = false;
+    let handled = false;
+    setVoiceNote(null);
+    setVoiceState("listening");
+    rec.onresult = async (event) => {
+      handled = true;
+      const transcript = (event.results?.[0]?.[0]?.transcript || "").trim();
+      if (!transcript) { setVoiceState("idle"); openManualAdd("Couldn't catch that — enter manually"); return; }
+      setVoiceState("parsing");
+      try {
+        const resp = await fetch("/api/parse-expense", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ transcript, currency: trip.currency }) });
+        const data = await resp.json();
+        if (!resp.ok || data.error || data.amount == null) { setVoiceState("idle"); openManualAdd("Couldn't catch that — enter manually"); return; }
+        setVoiceNote(null);
+        setVoicePrefill({ amount: data.amount, category: data.category, title: data.title, confidence: data.confidence });
+        setVoiceState("idle");
+        setScreen("add");
+      } catch (err) {
+        console.error("parse-expense request failed:", err);
+        setVoiceState("idle");
+        openManualAdd("Couldn't catch that — enter manually");
+      }
+    };
+    rec.onerror = () => { if (handled) return; handled = true; setVoiceState("idle"); openManualAdd("Couldn't catch that — enter manually"); };
+    rec.onend = () => { if (handled) return; handled = true; setVoiceState("idle"); openManualAdd("Couldn't catch that — enter manually"); };
+    try { rec.start(); } catch { setVoiceState("idle"); openManualAdd("Couldn't catch that — enter manually"); }
+  };
   // Pre-trip estimator handoff: estimator stores `pendingTrip` in localStorage,
   // we hydrate the new-trip form once when the user lands authenticated.
   const [pendingPrefill, setPendingPrefill] = useState(null);
@@ -1432,7 +1481,7 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
         {screen === "create-trip" && <CreateTripScreen onSave={t => { setTrip(t); setExpenses([]); setPendingPrefill(null); setScreen("dashboard"); }} onBack={trip && trip.name && expenses.length >= 0 ? () => { setPendingPrefill(null); setScreen("dashboard"); } : null} isPro={isPro} onPaywall={onPaywall} prefill={pendingPrefill} />}
         {screen === "dashboard" && <DashboardScreen expenses={expenses} trip={trip} setScreen={setScreen} setSelectedExpense={setSelectedExpense} />}
         {screen === "history" && <HistoryScreen expenses={expenses} trip={trip} setScreen={setScreen} setSelectedExpense={setSelectedExpense} />}
-        {screen === "add" && <AddExpenseScreen onSave={addExpense} onBack={() => setScreen("dashboard")} trip={trip} />}
+        {screen === "add" && <AddExpenseScreen onSave={addExpense} onBack={() => { setVoicePrefill(null); setVoiceNote(null); setScreen("dashboard"); }} trip={trip} prefill={voicePrefill} note={voiceNote} />}
         {screen === "edit" && <AddExpenseScreen onSave={handleEditSave} onBack={() => setScreen("expense-detail")} trip={trip} editExpense={editExpense} />}
         {screen === "budget" && <BudgetScreen expenses={expenses} trip={trip} />}
         {screen === "reports" && <ReportsScreen expenses={expenses} trip={trip} setScreen={setScreen} />}
@@ -1441,9 +1490,11 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
         {screen === "settings" && <SettingsScreen trip={trip} onUpdateTrip={setTrip} onClearData={() => { setExpenses([]); setScreen("dashboard"); }} onDeleteTrip={async () => { try { if (tripDbId) await dbDeleteTrip(tripDbId); } catch (err) { console.error("deleteTrip failed:", err); alert("Could not delete trip. Try again."); return; } setExpenses([]); setTrip(null); setTripDbId(null); setScreen("welcome"); screenHistory.current = ["welcome"]; }} onNewTrip={() => setScreen("create-trip")} onBack={() => setScreen("dashboard")} user={user} profile={profile} isPro={isPro} onSignOut={onSignOut} onInstall={onInstall} isInstalled={isInstalled} onPaywall={onPaywall} />}
         {screen === "email-report" && <EmailReportScreen trip={trip} expenses={expenses} onBack={() => setScreen("reports")} />}
       </div>
-      {showQuickAdd && <QuickAddSheet onSave={addExpense} onFullForm={() => { setShowQuickAdd(false); setScreen("add"); }} onClose={() => setShowQuickAdd(false)} trip={trip} />}
+      {showQuickAdd && <QuickAddSheet onSave={addExpense} onFullForm={() => { setVoicePrefill(null); setVoiceNote(null); setShowQuickAdd(false); setScreen("add"); }} onClose={() => setShowQuickAdd(false)} trip={trip} />}
       {isNav && !showQuickAdd && (
         <div style={{ position: "fixed", bottom: 88, right: "calc(50% - 195px + 16px)", display: "flex", flexDirection: "column", gap: 10, zIndex: 100, alignItems: "flex-end" }}>
+          <style>{`@keyframes vpulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.08); opacity: 0.7; } }`}</style>
+          <button onClick={startVoice} disabled={voiceState !== "idle"} title="Add by voice" style={{ width: 56, height: 56, borderRadius: "50%", background: voiceState === "listening" ? T.red : T.surface, border: `2px solid ${voiceState === "listening" ? T.red : T.accent}`, cursor: voiceState === "idle" ? "pointer" : "default", fontSize: 24, display: "flex", alignItems: "center", justifyContent: "center", color: T.text, boxShadow: voiceState === "listening" ? `0 8px 30px ${T.red}66` : `0 4px 20px ${T.accent}33`, animation: voiceState === "listening" ? "vpulse 1s ease-in-out infinite" : "none" }}>{voiceState === "parsing" ? "⏳" : "🎤"}</button>
           <button onClick={() => setShowQuickAdd(true)} style={{ width: 56, height: 56, borderRadius: "50%", background: T.accent, border: "none", cursor: "pointer", fontSize: 28, fontWeight: 900, color: T.bg, boxShadow: `0 8px 30px ${T.accent}66`, display: "flex", alignItems: "center", justifyContent: "center", transition: "transform 0.15s" }} onMouseEnter={e => e.currentTarget.style.transform = "scale(1.1)"} onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}>+</button>
         </div>
       )}
