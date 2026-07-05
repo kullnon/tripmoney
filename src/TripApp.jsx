@@ -1420,9 +1420,10 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
         <div style={{ position: "sticky", top: 0, zIndex: 50, background: T.bg + "EE", backdropFilter: "blur(12px)", borderBottom: `1px solid ${T.border}`, padding: "10px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ display: "flex", gap: 4, alignItems: "center" }}><span style={{ fontSize: 18, fontWeight: 900, color: T.text }}>My</span><span style={{ fontSize: 18, fontWeight: 900, color: T.accent }}>Trip</span><span style={{ fontSize: 18, fontWeight: 900, color: T.text }}>Money</span></div>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <span style={{ color: T.textMid, fontSize: 12 }}>{(trip.country ? countryByCode(trip.country).flag : curByCode(trip.currency).flag)} {trip.isMultiLeg ? `${trip.legs.length} legs` : trip.destination}</span>
+            <span style={{ color: T.textMid, fontSize: 12, display: "inline-block", maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(trip.country ? countryByCode(trip.country).flag : curByCode(trip.currency).flag)} {trip.isMultiLeg ? `${trip.legs.length} legs` : trip.destination}</span>
             <button onClick={() => setScreen("trips-list")} title="My Trips" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, padding: 0, color: T.textDim }}>🔄</button>
             <button onClick={() => setScreen("settings")} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, padding: 0, color: T.textDim }}>⚙️</button>
+            <button onClick={onSignOut} style={{ background: "transparent", border: `1px solid ${T.accent}55`, color: T.accent, borderRadius: 10, padding: "5px 11px", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", lineHeight: 1 }}>Log out</button>
           </div>
         </div>
       )}

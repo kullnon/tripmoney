@@ -214,30 +214,11 @@ export default function App() {
     return <LandingPage onGetStarted={handleStartFree} onLogin={() => setView("auth")} onGoPro={handleGoPro} />;
   };
 
-  // Global logout: show on every logged-in screen (TripApp's gear-icon logout can coexist)
-  const showGlobalLogout = !!user;
+  // Logout now lives inside TripApp's header control row (label · 🔄 · ⚙️ · Log out),
+  // wired via the onSignOut={handleSignOut} prop passed to <TripApp/> above.
 
   return (
     <>
-      {showGlobalLogout && (
-        <div style={{ position: "fixed", top: 16, right: 20, zIndex: 200 }}>
-          <button
-            onClick={handleSignOut}
-            style={{
-              background: "transparent",
-              border: `1px solid ${T.accent}55`,
-              color: T.accent,
-              borderRadius: 10,
-              padding: "8px 16px",
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: "pointer",
-            }}
-          >
-            Log out
-          </button>
-        </div>
-      )}
       {renderView()}
       {showInstallModal && <InstallModal onClose={() => setShowInstallModal(false)} isIOS={isIOS} isAndroid={isAndroid} canInstall={canInstall} triggerInstall={triggerInstall} />}
     </>
