@@ -1155,9 +1155,6 @@ function BudgetScreen({ expenses, trip }) {
 // Kept verbatim except it renders with MyTripMoney's dark theme + currency.
 const DONUT_COLORS = ["#2a78d6", "#1baf7a", "#eda100", "#008300", "#4a3aa7", "#e34948", "#0e9488", "#a83279"];
 const DONUT_OTHER = "#a8a29e";
-// Slices at/above this % get a direct callout ON the donut; thinner ones carry no
-// external label and appear only in the trimmed legend (so there's zero duplication).
-const DONUT_LABEL_MIN = 8;
 
 // Collapse a descending-sorted [{label, value}] list into ≤9 slices: the top 8 by
 // amount get palette colors in order; any remainder merges into a single grouped
@@ -1171,23 +1168,20 @@ function donutSlices(rows) {
   return { slices: slices.map(s => ({ ...s, pct: total ? (s.value / total) * 100 : 0 })), total };
 }
 
-// Hand-built inline-SVG donut — no chart library, no <canvas> — so it survives the
-// Save-as-PDF / Print flow. Returns an SVG markup string used via dangerouslySetInnerHTML.
-// Slices ≥ LABEL_MIN% get a compact stacked callout (name / amount · %) just outside the
-// ring; thinner slices carry no external label and live only in the legend. Callouts are
-// collision-avoided per side (pushed apart vertically) with short leader lines.
-function donutSVG(slices, centerTop, centerSub, ink, inkDim, sym = "$") {
-  const W = 400, H = 264, cx = W / 2, cy = H / 2, rOuter = 74, rInner = 45;
-  const LABEL_MIN = DONUT_LABEL_MIN;
-  const NAME_FS = 14, DETAIL_FS = 13, LINE_DY = NAME_FS + 1;
+// Hand-built inline-SVG donut — no chart library, no <canvas>. Renders ONLY the ring
+// and the center total; category names/amounts are shown in a legend list below the
+// donut (in JSX), which can't clip against the card edge. Returns an SVG markup string.
+function donutSVG(slices, centerTop, centerSub, ink, inkDim) {
+  // Ring + center total ONLY. Category labels live in a legend list BELOW the donut
+  // (rendered in ReactJSX), so nothing can clip against the card edge regardless of
+  // how long a category name is. Compact, centered viewBox.
+  const W = 220, H = 200, cx = W / 2, cy = H / 2, rOuter = 80, rInner = 52;
   const esc = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const money = (v) => `${sym}${Math.round(v).toLocaleString()}`;
   const pt = (r, a) => [cx + r * Math.cos(a), cy + r * Math.sin(a)];
   const single = slices.length === 1;
   let cum = -Math.PI / 2, wedges = "";
-  const cand = [];
   slices.forEach(s => {
-    const frac = s.pct / 100, start = cum, end = cum + frac * 2 * Math.PI, mid = (start + end) / 2;
+    const frac = s.pct / 100, start = cum, end = cum + frac * 2 * Math.PI;
     cum = end;
     if (single) {
       wedges += `<circle cx="${cx}" cy="${cy}" r="${(rOuter + rInner) / 2}" fill="none" stroke="${s.color}" stroke-width="${rOuter - rInner}"/>`;
@@ -1197,43 +1191,14 @@ function donutSVG(slices, centerTop, centerSub, ink, inkDim, sym = "$") {
       const [ix2, iy2] = pt(rInner, end), [ix1, iy1] = pt(rInner, start);
       wedges += `<path d="M ${ox1.toFixed(2)} ${oy1.toFixed(2)} A ${rOuter} ${rOuter} 0 ${large} 1 ${ox2.toFixed(2)} ${oy2.toFixed(2)} L ${ix2.toFixed(2)} ${iy2.toFixed(2)} A ${rInner} ${rInner} 0 ${large} 0 ${ix1.toFixed(2)} ${iy1.toFixed(2)} Z" fill="${s.color}" stroke="${T.card}" stroke-width="2" stroke-linejoin="round"/>`;
     }
-    if (s.pct >= LABEL_MIN) {
-      const right = Math.cos(mid) >= 0;
-      cand.push({ mid, right, idealY: cy + (rOuter + 8) * Math.sin(mid), name: esc(s.label).slice(0, 18), detail: `${money(s.value)} · ${Math.round(s.pct)}%` });
-    }
   });
-
-  const GAP = Math.round(NAME_FS * 0.72 + LINE_DY + DETAIL_FS * 0.25 + 6), TOP = 16, BOT = H - 16;
-  const layout = (arr) => {
-    arr.sort((a, b) => a.idealY - b.idealY);
-    let prev = -Infinity;
-    arr.forEach(l => { l.y = Math.max(l.idealY, prev + GAP, TOP); prev = l.y; });
-    const over = arr.length ? arr[arr.length - 1].y - BOT : 0;
-    if (over > 0) { let p = Infinity; for (let i = arr.length - 1; i >= 0; i--) { arr[i].y = Math.min(arr[i].y - over, p - GAP); p = arr[i].y; } }
-    return arr;
-  };
-  const rightCol = layout(cand.filter(c => c.right));
-  const leftCol = layout(cand.filter(c => !c.right));
-
-  let labels = "";
-  const draw = (l) => {
-    const colX = l.right ? cx + rOuter + 16 : cx - rOuter - 16;
-    const [p0x, p0y] = pt(rOuter, l.mid), [p1x, p1y] = pt(rOuter + 8, l.mid);
-    const endX = l.right ? colX - 3 : colX + 3;
-    const anchor = l.right ? "start" : "end";
-    labels += `<polyline points="${p0x.toFixed(1)},${p0y.toFixed(1)} ${p1x.toFixed(1)},${p1y.toFixed(1)} ${endX.toFixed(1)},${l.y.toFixed(1)}" fill="none" stroke="${inkDim}" stroke-width="0.75"/>`;
-    const nameY = l.y - 3, detailY = l.y - 3 + LINE_DY;
-    labels += `<text x="${colX.toFixed(1)}" y="${nameY.toFixed(1)}" text-anchor="${anchor}" font-size="${NAME_FS}" font-weight="800" fill="${ink}">${l.name}</text>`;
-    labels += `<text x="${colX.toFixed(1)}" y="${detailY.toFixed(1)}" text-anchor="${anchor}" font-size="${DETAIL_FS}" font-weight="700" fill="${ink}">${l.detail}</text>`;
-  };
-  rightCol.forEach(draw); leftCol.forEach(draw);
 
   // Auto-fit the center total to the inner circle: big for short amounts, shrinking so a
   // 7-digit value (e.g. $1,234,567.00) still fits without overflowing the ring.
   const ctStr = String(centerTop);
   const innerW = rInner * 2 * 0.86;                        // usable width inside the donut hole
-  const centerFS = Math.max(10, Math.min(24, Math.round(innerW / (ctStr.length * 0.60))));
-  return `<svg viewBox="0 0 ${W} ${H}" width="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Spending by category" style="max-width:380px;display:block;margin:0 auto;height:auto">${wedges}<text x="${cx}" y="${cy - 2}" text-anchor="middle" font-size="${centerFS}" font-weight="900" fill="${ink}">${esc(centerTop)}</text><text x="${cx}" y="${cy + 15}" text-anchor="middle" font-size="11" font-weight="600" fill="${inkDim}">${esc(centerSub)}</text>${labels}</svg>`;
+  const centerFS = Math.max(11, Math.min(26, Math.round(innerW / (ctStr.length * 0.60))));
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Spending by category" style="max-width:240px;display:block;margin:0 auto;height:auto">${wedges}<text x="${cx}" y="${cy - 2}" text-anchor="middle" font-size="${centerFS}" font-weight="900" fill="${ink}">${esc(centerTop)}</text><text x="${cx}" y="${cy + 16}" text-anchor="middle" font-size="12" font-weight="600" fill="${inkDim}">${esc(centerSub)}</text></svg>`;
 }
 
 // ─── REPORTS ──────────────────────────────────────────────────────
@@ -1250,10 +1215,18 @@ function ReportsScreen({ expenses, trip, setScreen }) {
       {donut.slices.length > 0 && (
         <Card style={{ marginBottom: 16 }}>
           <div style={{ color: T.textMid, fontSize: 12, fontWeight: 700, textTransform: "uppercase", marginBottom: 10 }}>Spending Breakdown</div>
-          <div dangerouslySetInnerHTML={{ __html: donutSVG(donut.slices, donutCenter, "spent", T.text, T.textDim, curByCode(tc).symbol) }} />
-          {donut.slices.some(s => s.pct < DONUT_LABEL_MIN) && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 12 }}>{donut.slices.filter(s => s.pct < DONUT_LABEL_MIN).map(s => <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}><span style={{ width: 12, height: 12, borderRadius: 3, background: s.color, flexShrink: 0 }} /><span style={{ flex: 1, color: T.textMid }}>{s.label}</span><span style={{ color: T.text, fontWeight: 800 }}>{fmtCur(s.value, tc)}</span><span style={{ width: 48, textAlign: "right", color: T.textMid, fontWeight: 800 }}>{Math.round(s.pct)}%</span></div>)}</div>
-          )}
+          <div dangerouslySetInnerHTML={{ __html: donutSVG(donut.slices, donutCenter, "spent", T.text, T.textDim) }} />
+          {/* Full legend BELOW the donut — color dot · name · amount · % · can't clip. */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 16 }}>
+            {donut.slices.map(s => (
+              <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14 }}>
+                <span style={{ width: 12, height: 12, borderRadius: 3, background: s.color, flexShrink: 0 }} />
+                <span style={{ flex: 1, minWidth: 0, color: T.text, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.label}</span>
+                <span style={{ color: T.text, fontWeight: 800, flexShrink: 0 }}>{fmtCur(s.value, tc)}</span>
+                <span style={{ width: 44, textAlign: "right", color: T.textMid, fontWeight: 800, flexShrink: 0 }}>{Math.round(s.pct)}%</span>
+              </div>
+            ))}
+          </div>
         </Card>
       )}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>{stats.map(({ l, v, c }) => <Card key={l} style={{ padding: 14 }}><div style={{ color: c, fontSize: 18, fontWeight: 900 }}>{v}</div><div style={{ color: T.textDim, fontSize: 11, fontWeight: 600, marginTop: 3 }}>{l}</div></Card>)}</div>
