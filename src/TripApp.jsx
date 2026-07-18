@@ -276,7 +276,7 @@ const TITLE_ICONS = [
   [["burger king", "mcdonald", "wendy", "whopper", "burger"], "🍔"],
   [["home depot", "hardware", "lumber", "ikea", "lowes"], "🪚"],
   [["uber", "lyft", "taxi", "cab"], "🚗"],
-  [["airfare", "airline", "flight", "delta", "american air", "american"], "✈️"],
+  [["airfare", "airline", "flight", "delta", "american air"], "✈️"],
   [["macy", "shoe", "clothing", "mall"], "🛍️"],
   [["grocery", "supermarket", "whole foods", "walmart"], "🛒"],
   [["coffee", "starbucks", "cafe"], "☕"],
