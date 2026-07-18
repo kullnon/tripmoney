@@ -870,6 +870,8 @@ function HistoryScreen({ expenses, trip, setScreen, setSelectedExpense, onEdit, 
   const dates = Object.keys(grouped).sort((a, b) => groupTs(b).localeCompare(groupTs(a)));
   return (
     <div style={{ padding: "20px 16px 100px" }}>
+      {/* Horizontal-scroll filter rows: no wrap, hidden scrollbar — nothing spills off-screen. */}
+      <style>{`.hchips{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none;-ms-overflow-style:none;flex-wrap:nowrap}.hchips::-webkit-scrollbar{display:none;height:0}`}</style>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 10 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
           <div style={{ color: T.text, fontSize: 22, fontWeight: 900 }}>All Expenses</div>
@@ -878,12 +880,12 @@ function HistoryScreen({ expenses, trip, setScreen, setSelectedExpense, onEdit, 
         {onAddPrior && <button onClick={onAddPrior} title="Log an expense on a past date" style={{ flexShrink: 0, background: T.accent + "18", color: T.accent, border: `1px solid ${T.accent}55`, borderRadius: 10, padding: "8px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", lineHeight: 1 }}>📅 Add prior expense</button>}
       </div>
       <div style={{ position: "relative", marginBottom: 12 }}><span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: T.textDim }}>🔍</span><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..." style={{ ...inputStyle, paddingLeft: 42 }} /></div>
-      <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 8 }}>
+      <div className="hchips" style={{ display: "flex", gap: 8, paddingBottom: 8, paddingRight: 4 }}>
         {["All", ...PHASES].map(p => <button key={p} onClick={() => setFilterPhase(p)} style={{ flexShrink: 0, padding: "7px 14px", borderRadius: 99, fontSize: 12, fontWeight: 700, cursor: "pointer", background: filterPhase === p ? T.accent : T.card, color: filterPhase === p ? T.bg : T.textMid, border: `1px solid ${filterPhase === p ? T.accent : T.border}` }}>{p}</button>)}
         <button onClick={() => setSortBy(s => s === "date" ? "amount" : "date")} style={{ flexShrink: 0, padding: "7px 14px", borderRadius: 99, fontSize: 12, fontWeight: 700, cursor: "pointer", background: T.card, color: T.accent, border: `1px solid ${T.accent}44` }}>{sortBy === "date" ? "📅" : "💰"}</button>
       </div>
       {trip.isMultiLeg && (
-        <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 8 }}>
+        <div className="hchips" style={{ display: "flex", gap: 8, paddingBottom: 8, paddingRight: 4 }}>
           <button onClick={() => setFilterLeg("All")} style={{ flexShrink: 0, padding: "6px 12px", borderRadius: 99, fontSize: 11, fontWeight: 700, cursor: "pointer", background: filterLeg === "All" ? T.purple : T.card, color: filterLeg === "All" ? "#fff" : T.textDim, border: `1px solid ${filterLeg === "All" ? T.purple : T.border}` }}>All Legs</button>
           {trip.legs.map((leg, i) => <button key={leg.id} onClick={() => setFilterLeg(leg.id)} style={{ flexShrink: 0, padding: "6px 12px", borderRadius: 99, fontSize: 11, fontWeight: 700, cursor: "pointer", background: filterLeg === leg.id ? LEG_COLORS[i] + "33" : T.card, color: filterLeg === leg.id ? LEG_COLORS[i] : T.textDim, border: `1px solid ${filterLeg === leg.id ? LEG_COLORS[i] : T.border}` }}>{leg.from}→{leg.to}</button>)}
         </div>
