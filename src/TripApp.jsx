@@ -275,6 +275,8 @@ const catById = (id) => CATEGORIES.find(c => c.id === id) || CATEGORIES[11];
 const TITLE_ICONS = [
   [["burger king", "mcdonald", "wendy", "whopper", "burger"], "🍔"],
   [["home depot", "hardware", "lumber", "ikea", "lowes"], "🪚"],
+  [["gas station", "gas", "fuel", "shell", "chevron", "exxon", "bp"], "⛽"],
+  [["tire", "tires", "auto repair", "mechanic", "brakes"], "🔧"],
   [["uber", "lyft", "taxi", "cab"], "🚗"],
   [["airfare", "airline", "flight", "delta", "american air"], "✈️"],
   [["macy", "shoe", "clothing", "mall"], "🛍️"],
@@ -387,6 +389,9 @@ function LegSelector({ trip, activeLegId, onChange }) {
 function generateReportHTML(trip, expenses) {
   const cur = curByCode(trip.currency);
   const f = (n) => `${cur.symbol}${fmtNum(n, trip.currency)}`;
+  // Real MyTripMoney logo (same asset as the app header). Absolute URL so it loads in the
+  // print popup (about:blank base) and in the downloaded HTML. Falls back to the wordmark.
+  const logoUrl = (typeof window !== "undefined" ? window.location.origin : "") + "/favicon.png";
   const total = expenses.reduce((s, e) => s + (e.status !== "refund" ? e.amount : -Math.abs(e.amount)), 0);
   const paid = expenses.filter(e => e.status === "paid").reduce((s, e) => s + e.amount, 0);
   const pending = expenses.filter(e => e.status === "pending" || e.status === "partial").reduce((s, e) => s + e.amount, 0);
@@ -400,7 +405,7 @@ function generateReportHTML(trip, expenses) {
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;900&display=swap');
     *{margin:0;padding:0;box-sizing:border-box}body{font-family:'DM Sans',sans-serif;background:#fff;color:#1a1a2e;padding:40px;max-width:800px;margin:0 auto}
-    h1{font-size:28px;font-weight:900;margin-bottom:4px}h2{font-size:18px;font-weight:800;margin:28px 0 12px;padding-bottom:6px;border-bottom:2px solid #00D4FF;color:#0A0F1E}
+    h1{font-size:28px;font-weight:900;margin-bottom:4px;display:flex;align-items:center;gap:10px}.brandmark{width:32px;height:32px;border-radius:7px;display:block}h2{font-size:18px;font-weight:800;margin:28px 0 12px;padding-bottom:6px;border-bottom:2px solid #00D4FF;color:#0A0F1E}
     .subtitle{color:#8A9BC4;font-size:14px;margin-bottom:24px}.grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin:16px 0}
     .stat{background:#f8f9fc;border-radius:12px;padding:14px}.stat-value{font-size:20px;font-weight:900}.stat-label{font-size:11px;color:#8A9BC4;font-weight:600;margin-top:2px}
     table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13px}th{text-align:left;padding:10px 8px;border-bottom:2px solid #e2e8f0;font-weight:700;font-size:11px;text-transform:uppercase;color:#8A9BC4}
@@ -409,7 +414,7 @@ function generateReportHTML(trip, expenses) {
     .footer{margin-top:40px;padding-top:16px;border-top:1px solid #e2e8f0;font-size:11px;color:#8A9BC4;text-align:center}
     @media print{body{padding:20px}}
   </style></head><body>
-    <h1>✈️ MyTripMoney Report</h1>
+    <h1><img class="brandmark" src="${logoUrl}" alt="" onerror="this.style.display='none'"/><span>My<span style="color:#00D4FF">Trip</span>Money</span>&nbsp;Report</h1>
     <p class="subtitle">${trip.name} · ${trip.isMultiLeg ? trip.legs.map(l => l.to).join(" → ") : trip.destination} · ${trip.departureDate} to ${trip.returnDate} (${tripDays} days)${trip.isMultiLeg ? ` · ${trip.legs.length} legs` : ""}</p>
     <h2>Budget Summary</h2>
     <div class="grid">
@@ -889,8 +894,6 @@ function HistoryScreen({ expenses, trip, setScreen, setSelectedExpense, onEdit, 
   if (sortBy === "amount") filtered = [...filtered].sort((a, b) => b.amount - a.amount); else filtered = [...filtered].sort((a, b) => ts(b).localeCompare(ts(a)));
   return (
     <div style={{ padding: "20px 16px 100px" }}>
-      {/* Horizontal-scroll filter rows: no wrap, hidden scrollbar — nothing spills off-screen. */}
-      <style>{`.hchips{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none;-ms-overflow-style:none;flex-wrap:nowrap}.hchips::-webkit-scrollbar{display:none;height:0}`}</style>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 10 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
           <div style={{ color: T.text, fontSize: 22, fontWeight: 900 }}>All Expenses</div>
@@ -899,12 +902,13 @@ function HistoryScreen({ expenses, trip, setScreen, setSelectedExpense, onEdit, 
         {onAddPrior && <button onClick={onAddPrior} title="Log an expense on a past date" style={{ flexShrink: 0, background: T.accent + "18", color: T.accent, border: `1px solid ${T.accent}55`, borderRadius: 10, padding: "8px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", lineHeight: 1 }}>📅 Add prior expense</button>}
       </div>
       <div style={{ position: "relative", marginBottom: 12 }}><span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: T.textDim }}>🔍</span><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..." style={{ ...inputStyle, paddingLeft: 42 }} /></div>
-      <div className="hchips" style={{ display: "flex", gap: 8, paddingBottom: 8, paddingRight: 4 }}>
+      {/* Wrap to multiple lines so every pill is always on-screen and reachable (no clip). */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
         {["All", ...PHASES].map(p => <button key={p} onClick={() => setFilterPhase(p)} style={{ flexShrink: 0, padding: "7px 14px", borderRadius: 99, fontSize: 12, fontWeight: 700, cursor: "pointer", background: filterPhase === p ? T.accent : T.card, color: filterPhase === p ? T.bg : T.textMid, border: `1px solid ${filterPhase === p ? T.accent : T.border}` }}>{p}</button>)}
         <button onClick={() => setSortBy(s => s === "date" ? "amount" : "date")} style={{ flexShrink: 0, padding: "7px 14px", borderRadius: 99, fontSize: 12, fontWeight: 700, cursor: "pointer", background: T.card, color: T.accent, border: `1px solid ${T.accent}44` }}>{sortBy === "date" ? "📅" : "💰"}</button>
       </div>
       {trip.isMultiLeg && (
-        <div className="hchips" style={{ display: "flex", gap: 8, paddingBottom: 8, paddingRight: 4 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
           <button onClick={() => setFilterLeg("All")} style={{ flexShrink: 0, padding: "6px 12px", borderRadius: 99, fontSize: 11, fontWeight: 700, cursor: "pointer", background: filterLeg === "All" ? T.purple : T.card, color: filterLeg === "All" ? "#fff" : T.textDim, border: `1px solid ${filterLeg === "All" ? T.purple : T.border}` }}>All Legs</button>
           {trip.legs.map((leg, i) => <button key={leg.id} onClick={() => setFilterLeg(leg.id)} style={{ flexShrink: 0, padding: "6px 12px", borderRadius: 99, fontSize: 11, fontWeight: 700, cursor: "pointer", background: filterLeg === leg.id ? LEG_COLORS[i] + "33" : T.card, color: filterLeg === leg.id ? LEG_COLORS[i] : T.textDim, border: `1px solid ${filterLeg === leg.id ? LEG_COLORS[i] : T.border}` }}>{leg.from}→{leg.to}</button>)}
         </div>
