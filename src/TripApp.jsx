@@ -1857,23 +1857,23 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
         const trips = await fetchTrips(user.id);
         if (cancelled) return;
         if (trips.length > 0) {
+          // RETURNING user with existing trips → straight to their dashboard (their most
+          // recent trip), ALWAYS. Never force them through "Confirm your trip" — the
+          // estimator→confirm flow is only for a user's FIRST trip. Drop any stale/pending
+          // estimate left in localStorage so it can't hijack the redirect.
           const latest = trips[0];
           setTrip(latest);
           setTripDbId(latest.dbId);
           const exps = await fetchExpenses(latest.dbId);
           if (cancelled) return;
           setExpenses(exps);
-          // If estimator handed off a prefill, jump straight to the new-trip
-          // form even when the user already has trips on file.
-          if (prefill) {
-            setScreenRaw("create-trip");
-            screenHistory.current = ["create-trip"];
-          } else {
-            setScreenRaw("dashboard");
-            screenHistory.current = ["dashboard"];
-          }
+          setPendingPrefill(null);
+          setScreenRaw("dashboard");
+          screenHistory.current = ["dashboard"];
         } else {
-          // First-time user: skip the welcome splash if estimator handed off
+          // Brand-new user (NO trips): show the setup flow. If they arrived from the
+          // landing-page estimator, jump straight to "Confirm your trip" to convert that
+          // estimate into their first trip; otherwise the welcome splash.
           if (prefill) {
             setScreenRaw("create-trip");
             screenHistory.current = ["create-trip"];
