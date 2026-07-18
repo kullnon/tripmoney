@@ -34,7 +34,7 @@ export default function SiteHeader({ scrollY = 0, onGetStarted }) {
         padding: "16px 0",
       }}
     >
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 24px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 32 }}>
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
         {/* Brand: logo pinned LEFT of the wordmark, never shrinks, gap for breathing room */}
         <a
           href="/"
@@ -45,26 +45,26 @@ export default function SiteHeader({ scrollY = 0, onGetStarted }) {
             <img
               src="/favicon.png"
               alt="MyTripMoney logo"
-              width={26}
-              height={26}
-              style={{ width: 26, height: 26, borderRadius: 7, flexShrink: 0, display: "block" }}
+              width={22}
+              height={22}
+              style={{ width: 22, height: 22, borderRadius: 6, flexShrink: 0, display: "block" }}
               onError={() => setLogoOk(false)}
             />
           ) : (
             <span
               aria-hidden="true"
               style={{
-                width: 26, height: 26, borderRadius: 7, flexShrink: 0,
+                width: 22, height: 22, borderRadius: 6, flexShrink: 0,
                 display: "flex", alignItems: "center", justifyContent: "center",
                 background: T.accent, color: T.bg, fontFamily: "Sora, sans-serif",
-                fontWeight: 800, fontSize: 15, lineHeight: 1,
+                fontWeight: 800, fontSize: 13, lineHeight: 1,
               }}
             >
               M
             </span>
           )}
           {/* One word: MyTripMoney — no spaces, no dots. Color split kept. */}
-          <span style={{ fontFamily: "Sora, sans-serif", fontWeight: 800, fontSize: 20, whiteSpace: "nowrap" }}>
+          <span style={{ fontFamily: "Sora, sans-serif", fontWeight: 800, fontSize: 17, whiteSpace: "nowrap" }}>
             <span style={{ color: T.text }}>My</span><span style={{ color: T.accent }}>Trip</span><span style={{ color: T.text }}>Money</span>
           </span>
         </a>

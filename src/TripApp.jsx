@@ -272,21 +272,34 @@ const catById = (id) => CATEGORIES.find(c => c.id === id) || CATEGORIES[11];
 // Reads the expense TITLE first; falls back to the category icon when no keyword
 // matches. Case-insensitive partial match, first hit wins. Edit freely to add more:
 // each entry is [ [keywords…], emoji ].
+// Each entry is [ [keywords…], emoji ]. Order matters (first match wins), so put
+// specific merchants ABOVE broad terms — the bank/"payment" group is LAST so
+// "Uber payment" stays 🚗 and only unmatched titles fall through to 🏦.
 const TITLE_ICONS = [
   [["burger king", "mcdonald", "wendy", "whopper", "burger"], "🍔"],
-  [["home depot", "hardware", "lumber", "ikea", "lowes"], "🪚"],
+  [["home depot", "hardware", "lumber", "lowes"], "🪚"],
+  [["ikea", "furniture", "table", "couch", "sofa", "desk", "mattress", "chair"], "🪑"],
   [["gas station", "gas", "fuel", "shell", "chevron", "exxon", "bp"], "⛽"],
-  [["tire", "tires", "auto repair", "mechanic", "brakes"], "🔧"],
+  [["tire", "tires", "auto repair", "mechanic", "brakes"], "🛞"],
   [["uber", "lyft", "taxi", "cab"], "🚗"],
   [["airfare", "airline", "flight", "delta", "american air"], "✈️"],
   [["macy", "shoe", "clothing", "mall"], "🛍️"],
   [["grocery", "supermarket", "whole foods", "walmart"], "🛒"],
   [["coffee", "starbucks", "cafe"], "☕"],
   [["hotel", "airbnb", "motel"], "🏨"],
+  [["mortgage", "rent", "loan", "bank", "payment"], "🏦"],
 ];
+// WHOLE-WORD, case-insensitive match: the keyword must appear as its own word
+// (bounded by non-alphanumeric chars or the string ends). This kills the
+// substring bug class — "gas" no longer matches "Las Vegas", "tire" no longer
+// matches "entire", "rent" no longer matches "current". Multi-word keywords
+// (e.g. "home depot") match as a bounded phrase. Add plural forms explicitly.
+function matchesKeyword(text, k) {
+  return new RegExp(`(?:^|[^a-z0-9])${k}(?:$|[^a-z0-9])`).test(text);
+}
 function iconForExpense(e) {
   const t = (e && e.title ? e.title : "").toLowerCase();
-  if (t) for (const [keys, emoji] of TITLE_ICONS) { if (keys.some(k => t.includes(k))) return emoji; }
+  if (t) for (const [keys, emoji] of TITLE_ICONS) { if (keys.some(k => matchesKeyword(t, k))) return emoji; }
   return catById(e && e.category).icon;
 }
 
