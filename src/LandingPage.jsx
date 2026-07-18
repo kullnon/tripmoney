@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import Estimator from "./components/Estimator.jsx";
 import FAQSection from "./components/FAQSection.jsx";
+import SiteHeader from "./components/SiteHeader.jsx";
 import {
   destinationCosts, POPULAR_SLUGS,
   ORIGINS, ORIGIN_CODES, DEFAULT_ORIGIN, flightEstimateFor,
@@ -146,31 +147,7 @@ export default function LandingPage({ onGetStarted, onLogin, onInstall, onGoPro,
 `}</style>
 
       {/* ─── NAV ─── */}
-      <nav style={{
-        position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
-        // Solid bg always so content scrolling underneath is fully hidden by
-        // the fixed nav — previous semi-transparent EE (93%) let estimator
-        // cards and copy bleed through. Border-bottom appears on scroll only.
-        background: T.bg,
-        borderBottom: scrollY > 50 ? `1px solid ${T.border}` : "1px solid transparent",
-        transition: "border-color 0.3s",
-        padding: "16px 0",
-      }}>
-        <Section style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <img src="/favicon.png" alt="" style={{ width: 32, height: 32, borderRadius: 8 }} onError={e => e.target.style.display = "none"} />
-            <span style={{ fontFamily: "Sora", fontWeight: 800, fontSize: 20 }}>
-              <span style={{ color: T.text }}>My</span><span style={{ color: T.accent }}>Trip</span><span style={{ color: T.text }}>Money</span>
-            </span>
-          </div>
-          <div className="nav-links" style={{ display: "flex", alignItems: "center" }}>
-            <a href="/guides" className="nav-pricing" style={{ color: T.textMid, textDecoration: "none", fontSize: 14, fontWeight: 600 }}>Guides</a>
-            <a href="#pricing" className="nav-pricing" style={{ color: T.textMid, textDecoration: "none", fontSize: 14, fontWeight: 600 }}>Pricing</a>
-            <a href="https://blog.mytripmoney.com" className="nav-pricing" style={{ color: T.textMid, textDecoration: "none", fontSize: 14, fontWeight: 600 }}>Blog</a>
-            <button onClick={() => onGetStarted && onGetStarted()} style={{ background: T.accent, color: T.bg, border: "none", borderRadius: 10, padding: "10px 20px", fontSize: 14, fontWeight: 800, cursor: "pointer" }} className="cta-btn nav-cta">Get Started</button>
-          </div>
-        </Section>
-      </nav>
+      <SiteHeader scrollY={scrollY} onGetStarted={onGetStarted} />
 
       {/* ─── HERO (estimator) ─── */}
       <section style={{ minHeight: "100vh", display: "flex", alignItems: "center", position: "relative", overflow: "hidden", paddingTop: 100, paddingBottom: 60 }}>

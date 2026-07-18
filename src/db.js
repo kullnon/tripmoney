@@ -99,6 +99,7 @@ export async function fetchExpenses(tripId) {
     originalCurrency: e.original_currency || 'USD',
     exchangeRate: parseFloat(e.exchange_rate) || 1,
     legId: e.leg_id,
+    location: e.location || null,
     dbId: e.id,
   }));
 }
@@ -127,6 +128,7 @@ export async function createExpense(userId, tripId, expense) {
       original_currency: expense.originalCurrency || 'USD',
       exchange_rate: expense.exchangeRate || 1,
       leg_id: expense.legId,
+      location: expense.location || null,
     })
     .select()
     .single();
@@ -155,6 +157,7 @@ export async function updateExpense(expenseId, expense) {
       original_currency: expense.originalCurrency || 'USD',
       exchange_rate: expense.exchangeRate || 1,
       leg_id: expense.legId,
+      location: expense.location || null,
       updated_at: new Date().toISOString(),
     })
     .eq('id', expenseId);

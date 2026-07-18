@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { fetchTrips, createTrip, updateTrip, deleteTrip as dbDeleteTrip, fetchExpenses, createExpense as dbCreateExpense, updateExpense as dbUpdateExpense, deleteExpense as dbDeleteExpense } from "./db";
+import { MoneyInput, fmtNum, parseNum } from "./money";
 
 // ─── DESIGN TOKENS ────────────────────────────────────────────────
 const T = {
@@ -24,9 +25,45 @@ const CATEGORIES = [
   { id: "tips", label: "Tips", icon: "💵", color: "#CAF0F8" },
   { id: "other", label: "Other", icon: "📦", color: "#ADB5BD" },
 ];
-const PAYMENT_METHODS = ["💳 Credit Card", "🏦 Debit Card", "💵 Cash", "📱 Venmo/PayPal", "🍎 Apple Pay"];
+const PAYMENT_METHODS = ["💳 Credit Card", "🏦 Debit Card", "💵 Cash", "📱 Venmo/PayPal", "🍎 Apple Pay", "💸 Zelle", "🧾 Check"];
 const PHASES = ["Pre-Trip", "During Trip", "Post-Trip"];
 const LEG_COLORS = ["#00D4FF", "#7B61FF", "#FF8A00", "#00E5A0", "#FFD600", "#FF4560", "#FF6B9D", "#B5E48C"];
+
+// ─── BACKDATING ───────────────────────────────────────────────────
+// How far back an expense may be dated. Single knob — change this one number.
+const BACKDATE_LIMIT_DAYS = 90;
+
+// ─── DRAGGABLE FAB PAIR (mic + plus) ──────────────────────────────
+// The pair is a vertically-stacked mic-over-plus, free-dragged anywhere in the
+// safe zone above the footer nav. Coords are the pair's top-left, viewport-fixed.
+const FAB_SIZE = 56;            // matches MyTripMoney's existing FAB buttons
+const FAB_GAP = 10;            // gap between the mic (top) and + (bottom)
+const FAB_MARGIN = 16;         // min gap from the screen edges
+const FAB_NAV_H = 86;          // reserved footer-nav height incl. safe-area
+const FAB_TAP_THRESHOLD = 6;   // px of movement under which a press is a TAP, not a drag
+const FAB_PAIR_W = FAB_SIZE;                    // column layout → width is one button
+const FAB_PAIR_H = FAB_SIZE * 2 + FAB_GAP;      // two buttons + the gap
+function fabBounds() {
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const navEdge = vh - FAB_NAV_H;
+  return {
+    minX: FAB_MARGIN,
+    maxX: Math.max(FAB_MARGIN, vw - FAB_PAIR_W - FAB_MARGIN),
+    minY: 8,
+    maxY: Math.max(8, navEdge - FAB_PAIR_H - 8),
+  };
+}
+function clampFab(x, y) {
+  const b = fabBounds();
+  return { x: Math.min(Math.max(x, b.minX), b.maxX), y: Math.min(Math.max(y, b.minY), b.maxY) };
+}
+// Default rest: right side, aligned to the centered 390-wide app column, just above the nav.
+function startFabPos() {
+  const vw = window.innerWidth;
+  const b = fabBounds();
+  const appRight = Math.min(vw, (vw + 390) / 2);
+  return clampFab(appRight - FAB_PAIR_W - FAB_MARGIN, b.maxY);
+}
 
 // ─── COUNTRIES ────────────────────────────────────────────────────
 const COUNTRIES = [
@@ -197,8 +234,37 @@ const SEED_EXPENSES = [
 ];
 
 // ─── HELPERS ──────────────────────────────────────────────────────
-const fmtCur = (n, code = "USD") => { const c = curByCode(code); return `${c.symbol}${Number(n || 0).toFixed(code === "JPY" || code === "KRW" ? 0 : 2)}`; };
+// Money display: MyTripMoney's own currency symbol + locale/currency-aware
+// thousands separators (via fmtNum). Display-only — never feed to an <input>.
+const fmtCur = (n, code = "USD") => `${curByCode(code).symbol}${fmtNum(n, code)}`;
 const fmt = (n) => fmtCur(n, "USD");
+
+// ─── DATES (local, UTC-safe) ──────────────────────────────────────
+// WRITE side: today's date as a LOCAL "YYYY-MM-DD". Using toISOString() here is
+// the classic midnight-rollover bug — it's UTC, so an evening entry in the
+// Americas rolls to tomorrow. Build the string from local calendar parts instead.
+function localToday() {
+  const d = new Date();
+  const p = (x) => String(x).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+// Add (or subtract) whole days to a local "YYYY-MM-DD", returning the same format.
+function addDays(iso, days) {
+  const [y, m, d] = String(iso).split("-").map(Number);
+  const dt = new Date(y, (m || 1) - 1, d || 1);
+  dt.setDate(dt.getDate() + days);
+  const p = (x) => String(x).padStart(2, "0");
+  return `${dt.getFullYear()}-${p(dt.getMonth() + 1)}-${p(dt.getDate())}`;
+}
+// DISPLAY side: turn a stored ISO date into a readable local label ("Jul 18, 2026").
+// Parsed at LOCAL midnight (iso + "T00:00:00") so it never shows the day before in
+// negative-UTC-offset zones. Stored values/queries stay ISO; only the render changes.
+function formatDate(iso, opts) {
+  if (!iso) return "";
+  const d = new Date(iso + "T00:00:00");
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("en-US", opts || { month: "short", day: "numeric", year: "numeric" });
+}
 const catById = (id) => CATEGORIES.find(c => c.id === id) || CATEGORIES[11];
 const uid = () => Date.now() + Math.floor(Math.random() * 10000);
 function pct(s, b) { return b ? Math.min(100, Math.round((s / b) * 100)) : 0; }
@@ -289,7 +355,7 @@ function LegSelector({ trip, activeLegId, onChange }) {
 // ─── REPORT GENERATOR ─────────────────────────────────────────────
 function generateReportHTML(trip, expenses) {
   const cur = curByCode(trip.currency);
-  const f = (n) => `${cur.symbol}${Number(n || 0).toFixed(2)}`;
+  const f = (n) => `${cur.symbol}${fmtNum(n, trip.currency)}`;
   const total = expenses.reduce((s, e) => s + (e.status !== "refund" ? e.amount : -Math.abs(e.amount)), 0);
   const paid = expenses.filter(e => e.status === "paid").reduce((s, e) => s + e.amount, 0);
   const pending = expenses.filter(e => e.status === "pending" || e.status === "partial").reduce((s, e) => s + e.amount, 0);
@@ -334,7 +400,7 @@ function generateReportHTML(trip, expenses) {
 
 function generateReportText(trip, expenses) {
   const cur = curByCode(trip.currency);
-  const f = (n) => `${cur.symbol}${Number(n||0).toFixed(2)}`;
+  const f = (n) => `${cur.symbol}${fmtNum(n, trip.currency)}`;
   const total = expenses.reduce((s, e) => s + (e.status !== "refund" ? e.amount : -Math.abs(e.amount)), 0);
   let text = `${trip.name} - Trip Expense Report\n\n`;
   text += `Destination: ${trip.isMultiLeg ? trip.legs.map(l => l.from + "→" + l.to).join(", ") : trip.destination}\n`;
@@ -535,13 +601,13 @@ function CreateTripScreen({ onSave, onBack, isPro, onPaywall, prefill = null }) 
               {COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.flag} {c.name}</option>)}
             </select>
           </InputRow>
-          <InputRow label="Departure"><input type="date" value={form.departureDate} min={new Date().toISOString().slice(0,10)} onChange={e => { const v = e.target.value; set("departureDate", v); if (form.returnDate && v > form.returnDate) set("returnDate", v); }} style={inputStyle} /></InputRow>
+          <InputRow label="Departure"><input type="date" value={form.departureDate} min={localToday()} onChange={e => { const v = e.target.value; set("departureDate", v); if (form.returnDate && v > form.returnDate) set("returnDate", v); }} style={inputStyle} /></InputRow>
           <InputRow label="Return"><input type="date" value={form.returnDate} min={form.departureDate || undefined} onChange={e => set("returnDate", e.target.value)} style={inputStyle} /></InputRow>
         </div>
         {totalDays > 0 && <div style={{ color: T.accent, fontSize: 13, fontWeight: 600, marginBottom: 14, marginTop: -6 }}>📅 {totalDays} day trip</div>}
         <CurrencyPicker value={form.currency} onChange={v => set("currency", v)} label="Trip Currency" />
         <InputRow label={`Budget (${form.currency})`}>
-          <div style={{ position: "relative" }}><span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: T.textMid, fontWeight: 700 }}>{curByCode(form.currency).symbol}</span><input value={form.budget} onChange={e => set("budget", e.target.value)} type="number" placeholder="0.00" style={{ ...inputStyle, paddingLeft: 36 }} /></div>
+          <div style={{ position: "relative" }}><span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: T.textMid, fontWeight: 700 }}>{curByCode(form.currency).symbol}</span><MoneyInput value={form.budget} currency={form.currency} onChange={v => set("budget", v)} style={{ ...inputStyle, paddingLeft: 36 }} /></div>
         </InputRow>
         <button disabled={!ok} onClick={() => onSave({ ...form, budget: parseFloat(form.budget) || 0, isMultiLeg: false, legs: [{ id: 1, from: "Home", to: form.destination, country: form.country, departureDate: form.departureDate, returnDate: form.returnDate, budget: parseFloat(form.budget) || 0, currency: form.currency }] })} style={{ width: "100%", background: ok ? T.accent : T.border, color: ok ? T.bg : T.textDim, border: "none", borderRadius: 14, padding: 16, fontSize: 17, fontWeight: 900, cursor: ok ? "pointer" : "not-allowed", marginTop: 10 }}>Start Tracking →</button>
       </div>
@@ -589,11 +655,11 @@ function CreateTripScreen({ onSave, onBack, isPro, onPaywall, prefill = null }) 
                 {COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.flag} {c.name}</option>)}
               </select>
             </div>
-            <div><div style={{ color: T.textDim, fontSize: 10, fontWeight: 600, marginBottom: 4 }}>DEPART {lockedDepart && "🔒"}</div><input type="date" value={leg.departureDate} min={new Date().toISOString().slice(0,10)} onChange={e => { if (!lockedDepart) { const v = e.target.value; updateLeg(leg.id, "departureDate", v); if (leg.returnDate && v > leg.returnDate) updateLeg(leg.id, "returnDate", v); } }} readOnly={lockedDepart} style={{ ...inputStyle, padding: "10px 12px", fontSize: 13, opacity: lockedDepart ? 0.6 : 1, cursor: lockedDepart ? "not-allowed" : "text" }} /></div>
+            <div><div style={{ color: T.textDim, fontSize: 10, fontWeight: 600, marginBottom: 4 }}>DEPART {lockedDepart && "🔒"}</div><input type="date" value={leg.departureDate} min={localToday()} onChange={e => { if (!lockedDepart) { const v = e.target.value; updateLeg(leg.id, "departureDate", v); if (leg.returnDate && v > leg.returnDate) updateLeg(leg.id, "returnDate", v); } }} readOnly={lockedDepart} style={{ ...inputStyle, padding: "10px 12px", fontSize: 13, opacity: lockedDepart ? 0.6 : 1, cursor: lockedDepart ? "not-allowed" : "text" }} /></div>
             <div><div style={{ color: T.textDim, fontSize: 10, fontWeight: 600, marginBottom: 4 }}>{i === legs.length - 1 && legs.length >= 2 ? "ARRIVE HOME" : "LEAVE TO"}</div><input type="date" value={leg.returnDate} min={leg.departureDate || undefined} onChange={e => updateLeg(leg.id, "returnDate", e.target.value)} style={{ ...inputStyle, padding: "10px 12px", fontSize: 13 }} /></div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            <div><div style={{ color: T.textDim, fontSize: 10, fontWeight: 600, marginBottom: 4 }}>BUDGET</div><div style={{ position: "relative" }}><span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: T.textDim, fontSize: 12 }}>{curByCode(leg.currency).symbol}</span><input value={leg.budget} onChange={e => updateLeg(leg.id, "budget", e.target.value)} type="number" placeholder="0" style={{ ...inputStyle, padding: "10px 12px 10px 28px", fontSize: 13 }} /></div></div>
+            <div><div style={{ color: T.textDim, fontSize: 10, fontWeight: 600, marginBottom: 4 }}>BUDGET</div><div style={{ position: "relative" }}><span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: T.textDim, fontSize: 12 }}>{curByCode(leg.currency).symbol}</span><MoneyInput value={leg.budget} currency={leg.currency} onChange={v => updateLeg(leg.id, "budget", v)} placeholder="0" style={{ ...inputStyle, padding: "10px 12px 10px 28px", fontSize: 13 }} /></div></div>
             <div><div style={{ color: T.textDim, fontSize: 10, fontWeight: 600, marginBottom: 4 }}>CURRENCY</div><select value={leg.currency} onChange={e => updateLeg(leg.id, "currency", e.target.value)} style={{ ...inputStyle, padding: "10px 12px", fontSize: 13 }}>{CURRENCIES.slice(0, 30).map(c => <option key={c.code} value={c.code}>{c.flag} {c.code}</option>)}</select></div>
           </div>
         </Card>
@@ -625,7 +691,7 @@ function QuickAddSheet({ onSave, onFullForm, onClose, trip }) {
   const [cat, setCat] = useState("food");
   const [amount, setAmount] = useState("");
   const [saved, setSaved] = useState(false);
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = localToday();
   const phase = autoPhase(todayStr, trip.departureDate, trip.returnDate);
   const legId = autoLeg(todayStr, trip.legs);
   const handleSave = () => {
@@ -648,7 +714,7 @@ function QuickAddSheet({ onSave, onFullForm, onClose, trip }) {
         </div>
         <div style={{ position: "relative", marginBottom: 8 }}>
           <span style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: T.accent, fontSize: 24, fontWeight: 900 }}>{curByCode(trip.currency).symbol}</span>
-          <input value={amount} onChange={e => setAmount(e.target.value)} type="number" placeholder="0.00" style={{ ...inputStyle, paddingLeft: 44, fontSize: 28, fontWeight: 900, textAlign: "center", height: 60 }} autoFocus />
+          <MoneyInput value={amount} currency={trip.currency} onChange={setAmount} style={{ ...inputStyle, paddingLeft: 44, fontSize: 28, fontWeight: 900, textAlign: "center", height: 60 }} autoFocus />
         </div>
         <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap", justifyContent: "center" }}>
           {[10, 20, 50, 100, 200].map(n => <button key={n} onClick={() => setAmount(String(n))} style={{ padding: "8px 18px", background: T.card, border: `1px solid ${T.border}`, borderRadius: 99, color: T.textMid, fontSize: 14, cursor: "pointer", fontWeight: 700 }}>{curByCode(trip.currency).symbol}{n}</button>)}
@@ -675,7 +741,7 @@ function DashboardScreen({ expenses, trip, setScreen, setSelectedExpense }) {
   const usedPct = pct(total, activeBudget);
   const color = healthColor(usedPct);
   const tripDays = daysBetween(activeDep, activeRet);
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = localToday();
   const todayTotal = filteredExp.filter(e => e.date === todayStr).reduce((s, e) => s + e.amount, 0);
   const daysElapsed = Math.max(1, daysBetween(activeDep, todayStr > activeRet ? activeRet : todayStr));
   const dailyRate = total / daysElapsed;
@@ -718,7 +784,7 @@ function DashboardScreen({ expenses, trip, setScreen, setSelectedExpense }) {
       </Card>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-        {[["Today", fmtCur(todayTotal, tc), T.yellow, todayStr], ["Pending", fmtCur(pending, tc), T.orange, `${dueSoon.length} items`], ["Avg/Day", fmtCur(dailyRate, tc), T.accent, `${daysElapsed}d`], ["Projected", fmtCur(projected, tc), projected > activeBudget ? T.red : T.green, "full trip"]].map(([l, v, c, sub]) => (
+        {[["Today", fmtCur(todayTotal, tc), T.yellow, formatDate(todayStr)], ["Pending", fmtCur(pending, tc), T.orange, `${dueSoon.length} items`], ["Avg/Day", fmtCur(dailyRate, tc), T.accent, `${daysElapsed}d`], ["Projected", fmtCur(projected, tc), projected > activeBudget ? T.red : T.green, "full trip"]].map(([l, v, c, sub]) => (
           <Card key={l} style={{ padding: 14 }}><div style={{ color: T.textMid, fontSize: 11, fontWeight: 600, textTransform: "uppercase" }}>{l}</div><div style={{ color: c, fontSize: 22, fontWeight: 900 }}>{v}</div><div style={{ color: T.textDim, fontSize: 11 }}>{sub}</div></Card>
         ))}
       </div>
@@ -758,7 +824,7 @@ function DashboardScreen({ expenses, trip, setScreen, setSelectedExpense }) {
           <div style={{ color: T.orange, fontSize: 12, fontWeight: 700, textTransform: "uppercase", marginBottom: 10 }}>⏳ Pending ({dueSoon.length})</div>
           {dueSoon.slice(0, 3).map(e => (
             <div key={e.id} onClick={() => { setSelectedExpense(e); setScreen("expense-detail"); }} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderTop: `1px solid ${T.border}`, cursor: "pointer" }}>
-              <div><div style={{ color: T.text, fontSize: 14, fontWeight: 600 }}>{e.title}</div><div style={{ color: T.textMid, fontSize: 11 }}>{e.date}</div></div>
+              <div><div style={{ color: T.text, fontSize: 14, fontWeight: 600 }}>{e.title}</div><div style={{ color: T.textMid, fontSize: 11 }}>{formatDate(e.date)}</div></div>
               <div style={{ color: T.orange, fontWeight: 800, fontSize: 15 }}>{fmtCur(e.amount, tc)}</div>
             </div>
           ))}
@@ -791,7 +857,7 @@ function DashboardScreen({ expenses, trip, setScreen, setSelectedExpense }) {
 }
 
 // ─── HISTORY ──────────────────────────────────────────────────────
-function HistoryScreen({ expenses, trip, setScreen, setSelectedExpense }) {
+function HistoryScreen({ expenses, trip, setScreen, setSelectedExpense, onEdit }) {
   const tc = trip.currency;
   const [search, setSearch] = useState(""); const [filterPhase, setFilterPhase] = useState("All"); const [filterStatus, setFilterStatus] = useState("All"); const [filterLeg, setFilterLeg] = useState("All"); const [sortBy, setSortBy] = useState("date");
   let filtered = expenses.filter(e => { const ms = !search || e.title.toLowerCase().includes(search.toLowerCase()); const mp = filterPhase === "All" || e.phase === filterPhase; const mst = filterStatus === "All" || e.status === filterStatus; const ml = filterLeg === "All" || e.legId === filterLeg; return ms && mp && mst && ml; });
@@ -815,12 +881,13 @@ function HistoryScreen({ expenses, trip, setScreen, setSelectedExpense }) {
       )}
       {dates.map(date => {
         const dayTotal = grouped[date].reduce((s, e) => s + e.amount, 0);
-        return (<div key={date}><div style={{ display: "flex", justifyContent: "space-between", padding: "14px 0 8px" }}><div style={{ color: T.textMid, fontSize: 12, fontWeight: 700 }}>{date}</div><div style={{ color: T.text, fontSize: 13, fontWeight: 700 }}>{fmtCur(dayTotal, tc)}</div></div>
+        return (<div key={date}><div style={{ display: "flex", justifyContent: "space-between", padding: "14px 0 8px" }}><div style={{ color: T.textMid, fontSize: 12, fontWeight: 700 }}>{formatDate(date)}</div><div style={{ color: T.text, fontSize: 13, fontWeight: 700 }}>{fmtCur(dayTotal, tc)}</div></div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>{grouped[date].map(e => { const cat = catById(e.category); return (
             <Card key={e.id} style={{ padding: "12px 14px", display: "flex", alignItems: "center", gap: 12 }} onClick={() => { setSelectedExpense(e); setScreen("expense-detail"); }}>
               <div style={{ width: 38, height: 38, borderRadius: 10, background: cat.color + "22", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>{cat.icon}</div>
-              <div style={{ flex: 1, minWidth: 0 }}><div style={{ color: T.text, fontSize: 14, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.title}</div><div style={{ color: T.textMid, fontSize: 11, marginTop: 2 }}>{e.payment}</div></div>
+              <div style={{ flex: 1, minWidth: 0 }}><div style={{ color: T.text, fontSize: 14, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.title}{e.location ? <span style={{ color: T.textMid, fontWeight: 500 }}> · {e.location}</span> : null}</div><div style={{ color: T.textMid, fontSize: 11, marginTop: 2 }}>{e.payment}</div></div>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3 }}><div style={{ color: T.text, fontWeight: 800, fontSize: 15 }}>{fmtCur(e.amount, tc)}</div><StatusBadge status={e.status} /></div>
+              {onEdit && <button onClick={(ev) => { ev.stopPropagation(); onEdit(e); }} aria-label="Edit expense" title="Edit" style={{ background: "none", border: `1px solid ${T.border}`, borderRadius: 8, cursor: "pointer", color: T.textMid, fontSize: 15, padding: "5px 7px", flexShrink: 0, lineHeight: 1 }}>✏️</button>}
             </Card>); })}</div></div>);
       })}
       {filtered.length === 0 && <div style={{ textAlign: "center", color: T.textDim, marginTop: 60 }}>No expenses found</div>}
@@ -851,7 +918,7 @@ function ExpenseDetailScreen({ expense, trip, setScreen, onDelete, onDuplicate, 
         </div>
       </Card>
       <Card style={{ marginBottom: 16 }}>
-        {[["📅 Date", expense.date], ["💳 Payment", expense.payment], ["🗂️ Category", cat.label], ["🗺️ Phase", expense.phase], trip.isMultiLeg && leg && ["✈️ Leg", `${leg.from} → ${leg.to}`], ["📝 Notes", expense.notes || "—"]].filter(Boolean).map(([l, v]) => (
+        {[["📅 Date", formatDate(expense.date)], ["💳 Payment", expense.payment], expense.location ? ["📍 Location", expense.location] : null, ["🗂️ Category", cat.label], ["🗺️ Phase", expense.phase], trip.isMultiLeg && leg && ["✈️ Leg", `${leg.from} → ${leg.to}`], ["📝 Notes", expense.notes || "—"]].filter(Boolean).map(([l, v]) => (
           <div key={l} style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderBottom: `1px solid ${T.border}` }}><span style={{ color: T.textMid, fontSize: 14 }}>{l}</span><span style={{ color: T.text, fontSize: 14, fontWeight: 600, maxWidth: "60%", textAlign: "right" }}>{v}</span></div>
         ))}
       </Card>
@@ -870,24 +937,32 @@ function ExpenseDetailScreen({ expense, trip, setScreen, onDelete, onDuplicate, 
 
 // ─── ADD/EDIT EXPENSE ─────────────────────────────────────────────
 function AddExpenseScreen({ onSave, onBack, trip, editExpense = null, prefill = null, note = null }) {
-  const isEdit = !!editExpense; const todayStr = new Date().toISOString().slice(0, 10); const tc = trip.currency;
+  const isEdit = !!editExpense; const todayStr = localToday(); const tc = trip.currency;
   // Voice pre-fill: seed amount/category/title from the parse; everything else uses the normal defaults.
   const preAmount = (!isEdit && prefill && prefill.amount != null) ? String(prefill.amount) : "";
   const lowConf = !isEdit && !!prefill && prefill.confidence === "low";
   const [form, setForm] = useState(editExpense ? { ...editExpense, amount: String(editExpense.amount), originalAmount: String(editExpense.originalAmount || editExpense.amount), exchangeRate: String(editExpense.exchangeRate || 1) } : {
-    title: prefill?.title || "", amount: preAmount, category: prefill?.category || "food", phase: autoPhase(todayStr, trip.departureDate, trip.returnDate), date: todayStr, payment: "💳 Credit Card", status: "paid", planned: false, notes: "", refundable: false, shared: false, sharedCount: 2, estimated: "", isDailySummary: false, originalAmount: preAmount, originalCurrency: tc, exchangeRate: "1", legId: autoLeg(todayStr, trip.legs),
+    title: prefill?.title || "", amount: preAmount, category: prefill?.category || "food", phase: autoPhase(todayStr, trip.departureDate, trip.returnDate), date: todayStr, payment: "💳 Credit Card", status: "paid", planned: false, notes: "", refundable: false, shared: false, sharedCount: 2, estimated: "", isDailySummary: false, originalAmount: preAmount, originalCurrency: tc, exchangeRate: "1", legId: autoLeg(todayStr, trip.legs), location: prefill?.location || "",
   });
   const flag = lowConf ? { boxShadow: `0 0 0 2px ${T.orange}88`, borderRadius: 14, padding: "8px 8px 2px", marginBottom: 8 } : undefined;
   const [saved, setSaved] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const useForeign = form.originalCurrency !== tc;
-  const handleDateChange = (v) => { set("date", v); set("phase", autoPhase(v, trip.departureDate, trip.returnDate)); set("legId", autoLeg(v, trip.legs)); };
+  // Backdating window: today back to BACKDATE_LIMIT_DAYS ago. Future dates are
+  // blocked entirely. When EDITING an already-saved expense that's older than the
+  // window (a historical/seed entry), the lower bound relaxes to that date so a
+  // routine edit never silently drags its date forward. The picker's min/max
+  // enforce this in the UI; clampDate guards typed/programmatic values too.
+  const backMin = addDays(todayStr, -BACKDATE_LIMIT_DAYS);
+  const minDate = isEdit && editExpense.date && editExpense.date < backMin ? editExpense.date : backMin;
+  const clampDate = (v) => { if (!v) return todayStr; if (v > todayStr) return todayStr; if (v < minDate) return minDate; return v; };
+  const handleDateChange = (v) => { const d = clampDate(v); set("date", d); set("phase", autoPhase(d, trip.departureDate, trip.returnDate)); set("legId", autoLeg(d, trip.legs)); };
   const handleForeignAmountChange = (v) => { set("originalAmount", v); set("amount", String(((parseFloat(v) || 0) * (parseFloat(form.exchangeRate) || 1)).toFixed(2))); };
   const handleRateChange = (v) => { set("exchangeRate", v); set("amount", String(((parseFloat(form.originalAmount) || 0) * (parseFloat(v) || 1)).toFixed(2))); };
   const handleSave = () => {
     if (!form.amount && !form.originalAmount) return;
     const title = form.title || catById(form.category).label;
-    onSave({ ...form, title, id: isEdit ? form.id : uid(), amount: parseFloat(form.amount) || 0, originalAmount: useForeign ? parseFloat(form.originalAmount) || 0 : parseFloat(form.amount) || 0, exchangeRate: useForeign ? parseFloat(form.exchangeRate) || 1 : 1, estimated: form.estimated ? parseFloat(form.estimated) : 0, sharedCount: form.shared ? Math.max(1, parseInt(form.sharedCount) || 2) : 1 });
+    onSave({ ...form, title, id: isEdit ? form.id : uid(), date: clampDate(form.date), location: (form.location || "").trim() || null, amount: parseNum(form.amount, tc) || 0, originalAmount: useForeign ? (parseNum(form.originalAmount, form.originalCurrency) || 0) : (parseNum(form.amount, tc) || 0), exchangeRate: useForeign ? parseFloat(form.exchangeRate) || 1 : 1, estimated: form.estimated ? (parseNum(form.estimated, tc) || 0) : 0, sharedCount: form.shared ? Math.max(1, parseInt(form.sharedCount) || 2) : 1 });
     setSaved(true); if (!isEdit) { setTimeout(() => setSaved(false), 1500); setForm(f => ({ ...f, title: "", amount: "", notes: "", originalAmount: "" })); }
   };
   return (
@@ -899,6 +974,7 @@ function AddExpenseScreen({ onSave, onBack, trip, editExpense = null, prefill = 
       {!isEdit && prefill && !note && <div style={{ background: (lowConf ? T.orange : T.accent) + "18", border: `1px solid ${(lowConf ? T.orange : T.accent)}55`, borderRadius: 12, padding: 12, marginBottom: 16, color: lowConf ? T.orange : T.accent, fontWeight: 700, fontSize: 13, textAlign: "center" }}>{lowConf ? "🎤 Heard it — double-check the amount & category, then save." : "🎤 Pre-filled from voice — review and save."}</div>}
       <div style={flag}><InputRow label="Category"><div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>{CATEGORIES.map(c => <button key={c.id} onClick={() => set("category", c.id)} style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", padding: "10px 12px", borderRadius: 12, cursor: "pointer", background: form.category === c.id ? c.color + "33" : T.card, border: `2px solid ${form.category === c.id ? c.color : T.border}`, gap: 4 }}><span style={{ fontSize: 22 }}>{c.icon}</span><span style={{ fontSize: 9, fontWeight: 700, color: form.category === c.id ? c.color : T.textDim }}>{c.label.split(" ")[0]}</span></button>)}</div></InputRow></div>
       <InputRow label="Expense Name"><input value={form.title} onChange={e => set("title", e.target.value)} placeholder={catById(form.category).label} style={inputStyle} /></InputRow>
+      <InputRow label="Location (optional)"><input value={form.location || ""} onChange={e => set("location", e.target.value)} placeholder="e.g. San Juan, PR" maxLength={80} style={inputStyle} /></InputRow>
 
       <InputRow label="Currency">
         <div style={{ display: "flex", gap: 8 }}>
@@ -910,11 +986,11 @@ function AddExpenseScreen({ onSave, onBack, trip, editExpense = null, prefill = 
       </InputRow>
 
       <div style={flag}>{useForeign ? (<>
-        <InputRow label={`Amount (${form.originalCurrency})`}><div style={{ position: "relative" }}><span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: T.purple, fontWeight: 700 }}>{curByCode(form.originalCurrency).symbol}</span><input value={form.originalAmount} onChange={e => handleForeignAmountChange(e.target.value)} type="number" placeholder="0.00" style={{ ...inputStyle, paddingLeft: 36 }} /></div></InputRow>
+        <InputRow label={`Amount (${form.originalCurrency})`}><div style={{ position: "relative" }}><span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: T.purple, fontWeight: 700 }}>{curByCode(form.originalCurrency).symbol}</span><MoneyInput value={form.originalAmount} currency={form.originalCurrency} onChange={v => handleForeignAmountChange(v)} style={{ ...inputStyle, paddingLeft: 36 }} /></div></InputRow>
         <InputRow label={`Rate (1 ${form.originalCurrency} = ? ${tc})`}><input value={form.exchangeRate} onChange={e => handleRateChange(e.target.value)} type="number" step="0.0001" style={inputStyle} /></InputRow>
         {form.amount && <div style={{ color: T.accent, fontSize: 14, fontWeight: 700, marginBottom: 14, marginTop: -8 }}>≈ {fmtCur(form.amount, tc)}</div>}
       </>) : (
-        <InputRow label={`Amount (${tc})`}><div style={{ position: "relative" }}><span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: T.textMid, fontWeight: 700 }}>{curByCode(tc).symbol}</span><input value={form.amount} onChange={e => { set("amount", e.target.value); set("originalAmount", e.target.value); }} type="number" placeholder="0.00" style={{ ...inputStyle, paddingLeft: 36 }} /></div></InputRow>
+        <InputRow label={`Amount (${tc})`}><div style={{ position: "relative" }}><span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: T.textMid, fontWeight: 700 }}>{curByCode(tc).symbol}</span><MoneyInput value={form.amount} currency={tc} onChange={v => { set("amount", v); set("originalAmount", v); }} style={{ ...inputStyle, paddingLeft: 36 }} /></div></InputRow>
       )}</div>
       <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>{[10, 20, 50, 100, 200].map(n => <button key={n} onClick={() => { if (useForeign) handleForeignAmountChange(String(n)); else { set("amount", String(n)); set("originalAmount", String(n)); } }} style={{ padding: "8px 16px", background: T.card, border: `1px solid ${T.border}`, borderRadius: 99, color: T.textMid, fontSize: 13, cursor: "pointer", fontWeight: 600 }}>{useForeign ? curByCode(form.originalCurrency).symbol : curByCode(tc).symbol}{n}</button>)}</div>
 
@@ -931,7 +1007,7 @@ function AddExpenseScreen({ onSave, onBack, trip, editExpense = null, prefill = 
         <InputRow label="Status"><SegmentedControl options={["paid", "pending", "partial", "refund"]} value={form.status} onChange={v => set("status", v)} colors={{ paid: T.green, pending: T.orange, partial: T.yellow, refund: T.purple }} /></InputRow>
       </div>
       <InputRow label="Payment"><select value={form.payment} onChange={e => set("payment", e.target.value)} style={inputStyle}>{PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}</select></InputRow>
-      <InputRow label="Date"><input type="date" value={form.date} onChange={e => handleDateChange(e.target.value)} style={inputStyle} /></InputRow>
+      <InputRow label="Date"><input type="date" value={form.date} min={minDate} max={todayStr} onChange={e => handleDateChange(e.target.value)} style={inputStyle} /><div style={{ color: T.textDim, fontSize: 11, marginTop: 6 }}>{form.date === todayStr ? "Today" : formatDate(form.date)} · backdate up to {BACKDATE_LIMIT_DAYS} days</div></InputRow>
       <InputRow label="Notes"><textarea value={form.notes} onChange={e => set("notes", e.target.value)} placeholder="Details..." rows={2} style={{ ...inputStyle, resize: "none" }} /></InputRow>
       <div style={{ display: "flex", gap: 12, marginBottom: 12 }}><ToggleChip label="📋 Planned" active={form.planned} onToggle={() => set("planned", !form.planned)} activeColor={T.purple} /><ToggleChip label="🔄 Refundable" active={form.refundable} onToggle={() => set("refundable", !form.refundable)} activeColor={T.green} /></div>
       <div style={{ display: "flex", gap: 12, marginBottom: 16 }}><ToggleChip label="👥 Shared" active={form.shared} onToggle={() => set("shared", !form.shared)} activeColor={T.yellow} />{form.shared && <div style={{ flex: 1 }}><input value={form.sharedCount} onChange={e => set("sharedCount", e.target.value)} type="number" min="2" placeholder="#" style={{ ...inputStyle, textAlign: "center" }} /></div>}</div>
@@ -1080,7 +1156,7 @@ function SettingsScreen({ trip, onUpdateTrip, onClearData, onDeleteTrip, onNewTr
               <InputRow label="Departure"><input type="date" value={form.departureDate || ""} onChange={e => { const v = e.target.value; set("departureDate", v); if (form.returnDate && v > form.returnDate) set("returnDate", v); }} style={inputStyle} /></InputRow>
               <InputRow label="Return"><input type="date" value={form.returnDate || ""} min={form.departureDate || undefined} onChange={e => set("returnDate", e.target.value)} style={inputStyle} /></InputRow>
             </div>
-            <InputRow label="Budget"><div style={{ position: "relative" }}><span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: T.textMid, fontWeight: 700 }}>{curByCode(form.currency).symbol}</span><input value={form.budget} onChange={e => set("budget", e.target.value)} type="number" style={{ ...inputStyle, paddingLeft: 36 }} /></div></InputRow>
+            <InputRow label="Budget"><div style={{ position: "relative" }}><span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: T.textMid, fontWeight: 700 }}>{curByCode(form.currency).symbol}</span><MoneyInput value={form.budget} currency={form.currency} onChange={v => set("budget", v)} style={{ ...inputStyle, paddingLeft: 36 }} /></div></InputRow>
           </>
         )}
       </Card>
@@ -1103,7 +1179,7 @@ function SettingsScreen({ trip, onUpdateTrip, onClearData, onDeleteTrip, onNewTr
                   <div><div style={{ color: T.textDim, fontSize: 10, fontWeight: 600, marginBottom: 4 }}>{i === legs.length - 1 && legs.length >= 2 ? "ARRIVE HOME" : "LEAVE TO"}</div><input type="date" value={leg.returnDate} min={leg.departureDate || undefined} onChange={e => updateLeg(leg.id, "returnDate", e.target.value)} style={{ ...inputStyle, padding: "10px 12px", fontSize: 13 }} /></div>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                  <div><div style={{ color: T.textDim, fontSize: 10, fontWeight: 600, marginBottom: 4 }}>BUDGET</div><div style={{ position: "relative" }}><span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: T.textDim, fontSize: 12 }}>{curByCode(leg.currency).symbol}</span><input value={leg.budget} onChange={e => updateLeg(leg.id, "budget", e.target.value)} type="number" style={{ ...inputStyle, padding: "10px 12px 10px 28px", fontSize: 13 }} /></div></div>
+                  <div><div style={{ color: T.textDim, fontSize: 10, fontWeight: 600, marginBottom: 4 }}>BUDGET</div><div style={{ position: "relative" }}><span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: T.textDim, fontSize: 12 }}>{curByCode(leg.currency).symbol}</span><MoneyInput value={leg.budget} currency={leg.currency} onChange={v => updateLeg(leg.id, "budget", v)} style={{ ...inputStyle, padding: "10px 12px 10px 28px", fontSize: 13 }} /></div></div>
                   <div><div style={{ color: T.textDim, fontSize: 10, fontWeight: 600, marginBottom: 4 }}>CURRENCY</div><select value={leg.currency} onChange={e => updateLeg(leg.id, "currency", e.target.value)} style={{ ...inputStyle, padding: "10px 12px", fontSize: 13 }}>{CURRENCIES.slice(0, 30).map(c => <option key={c.code} value={c.code}>{c.flag} {c.code}</option>)}</select></div>
                 </div>
               </div>
@@ -1316,7 +1392,7 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
         if (highConf) {
           // HAPPY PATH — build the expense with the same defaults Quick-Add/the form use,
           // save it directly (no form), land on the dashboard, and show an Undo toast.
-          const todayStr = new Date().toISOString().slice(0, 10);
+          const todayStr = localToday();
           const voiceKey = uid();
           const expense = {
             id: uid(), _voiceKey: voiceKey,
@@ -1505,10 +1581,53 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
     }
   };
 
-  const duplicateExpense = (e) => { const d = { ...e, id: uid(), date: new Date().toISOString().slice(0, 10), status: "paid" }; addExpense(d); setSelectedExpense(d); };
-  const handleEdit = (e) => { setEditExpense(e); setScreen("edit"); };
+  const duplicateExpense = (e) => { const d = { ...e, id: uid(), date: localToday(), status: "paid" }; addExpense(d); setSelectedExpense(d); };
+  const handleEdit = (e) => { setSelectedExpense(e); setEditExpense(e); setScreen("edit"); };
   const handleEditSave = (e) => { updateExpense(e); setEditExpense(null); setScreen("history"); };
   const isNav = ["dashboard", "history", "budget", "reports"].includes(screen);
+
+  // ─── DRAGGABLE FAB PAIR (mic + plus) ─────────────────────────────
+  // Free-drag the pair anywhere in the band above the nav. A press that moves
+  // less than FAB_TAP_THRESHOLD is a TAP (runs that button's action); anything
+  // more is a DRAG (repositions, fires no action). Position is session-only.
+  const [fabPos, setFabPos] = useState(() => (typeof window !== "undefined" ? startFabPos() : { x: 0, y: 0 }));
+  const fabRef = useRef(null);        // container — nudged directly during drag (no re-render)
+  const fabDrag = useRef(null);       // active drag: { sx, sy, bx, by, moved, fab, lastX, lastY }
+  const fabMovedRef = useRef(false);  // true once dragged → stop auto-repositioning
+  useEffect(() => {
+    if (isNav && !fabMovedRef.current) setFabPos(startFabPos());
+  }, [isNav]);
+  useEffect(() => {
+    const onResize = () => setFabPos(p => clampFab(p.x, p.y));
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  const onFabDown = (e) => {
+    const fab = e.target.closest?.("[data-fab]")?.dataset?.fab || null;
+    fabDrag.current = { sx: e.clientX, sy: e.clientY, bx: fabPos.x, by: fabPos.y, moved: false, fab, lastX: fabPos.x, lastY: fabPos.y };
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+  };
+  const onFabMove = (e) => {
+    const d = fabDrag.current;
+    if (!d) return;
+    const dx = e.clientX - d.sx, dy = e.clientY - d.sy;
+    if (!d.moved && Math.hypot(dx, dy) > FAB_TAP_THRESHOLD) d.moved = true;
+    if (d.moved) {
+      const p = clampFab(d.bx + dx, d.by + dy);
+      d.lastX = p.x; d.lastY = p.y;
+      if (fabRef.current) { fabRef.current.style.left = p.x + "px"; fabRef.current.style.top = p.y + "px"; }
+    }
+  };
+  const onFabUp = (e) => {
+    const d = fabDrag.current;
+    fabDrag.current = null;
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+    if (!d) return;
+    if (d.moved) { fabMovedRef.current = true; setFabPos({ x: d.lastX, y: d.lastY }); return; }
+    // A tap → run the pressed button's action.
+    if (d.fab === "mic") { if (voiceState === "idle") startVoice(); }        // busy states no-op
+    else if (d.fab === "add") { setShowQuickAdd(true); }                      // manual text quick-add
+  };
 
   return (
     <div style={{ fontFamily: "'DM Sans', 'SF Pro Display', -apple-system, sans-serif", background: T.bg, color: T.text, maxWidth: 390, margin: "0 auto", minHeight: "100vh", position: "relative", overflowX: "hidden" }}>
@@ -1527,7 +1646,7 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
         {screen === "welcome" && <WelcomeScreen onStart={() => { setTrip(DEFAULT_TRIP); setExpenses(SEED_EXPENSES); setScreen("dashboard"); }} onCreateTrip={() => setScreen("create-trip")} onInstall={onInstall} isInstalled={isInstalled} canInstall={canInstall} isIOS={isIOS} isMobile={isMobile} isPro={isPro} onPaywall={onPaywall} user={user} />}
         {screen === "create-trip" && <CreateTripScreen onSave={t => { setTrip(t); setExpenses([]); setPendingPrefill(null); setScreen("dashboard"); }} onBack={trip && trip.name && expenses.length >= 0 ? () => { setPendingPrefill(null); setScreen("dashboard"); } : null} isPro={isPro} onPaywall={onPaywall} prefill={pendingPrefill} />}
         {screen === "dashboard" && <DashboardScreen expenses={expenses} trip={trip} setScreen={setScreen} setSelectedExpense={setSelectedExpense} />}
-        {screen === "history" && <HistoryScreen expenses={expenses} trip={trip} setScreen={setScreen} setSelectedExpense={setSelectedExpense} />}
+        {screen === "history" && <HistoryScreen expenses={expenses} trip={trip} setScreen={setScreen} setSelectedExpense={setSelectedExpense} onEdit={handleEdit} />}
         {screen === "add" && <AddExpenseScreen onSave={addExpense} onBack={() => { setVoicePrefill(null); setVoiceNote(null); setScreen("dashboard"); }} trip={trip} prefill={voicePrefill} note={voiceNote} />}
         {screen === "edit" && <AddExpenseScreen onSave={handleEditSave} onBack={() => setScreen("expense-detail")} trip={trip} editExpense={editExpense} />}
         {screen === "budget" && <BudgetScreen expenses={expenses} trip={trip} />}
@@ -1546,10 +1665,17 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
         </div>
       )}
       {isNav && !showQuickAdd && (
-        <div style={{ position: "fixed", bottom: 88, right: "calc(50% - 195px + 16px)", display: "flex", flexDirection: "column", gap: 10, zIndex: 100, alignItems: "flex-end" }}>
+        <div
+          ref={fabRef}
+          onPointerDown={onFabDown}
+          onPointerMove={onFabMove}
+          onPointerUp={onFabUp}
+          onPointerCancel={onFabUp}
+          style={{ position: "fixed", left: fabPos.x, top: fabPos.y, display: "flex", flexDirection: "column", gap: FAB_GAP, zIndex: 100, alignItems: "center", touchAction: "none" }}
+        >
           <style>{`@keyframes vpulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.08); opacity: 0.7; } }`}</style>
-          <button onClick={startVoice} disabled={voiceState !== "idle"} title="Add by voice" style={{ width: 56, height: 56, borderRadius: "50%", background: voiceState === "listening" ? T.red : T.surface, border: `2px solid ${voiceState === "listening" ? T.red : T.accent}`, cursor: voiceState === "idle" ? "pointer" : "default", fontSize: 24, display: "flex", alignItems: "center", justifyContent: "center", color: voiceState === "listening" ? "#fff" : T.text, boxShadow: voiceState === "listening" ? `0 8px 30px ${T.red}66` : `0 4px 20px ${T.accent}33`, animation: voiceState === "listening" ? "vpulse 1s ease-in-out infinite" : "none" }}>{voiceState === "parsing" ? "⏳" : <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" y1="19" x2="12" y2="22" /></svg>}</button>
-          <button onClick={() => setShowQuickAdd(true)} style={{ width: 56, height: 56, borderRadius: "50%", background: T.accent, border: "none", cursor: "pointer", fontSize: 28, fontWeight: 900, color: T.bg, boxShadow: `0 8px 30px ${T.accent}66`, display: "flex", alignItems: "center", justifyContent: "center", transition: "transform 0.15s" }} onMouseEnter={e => e.currentTarget.style.transform = "scale(1.1)"} onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}>+</button>
+          <button data-fab="mic" title={voiceState === "listening" ? "Listening…" : "Add by voice (drag to move)"} style={{ width: FAB_SIZE, height: FAB_SIZE, borderRadius: "50%", background: voiceState === "listening" ? T.red : T.surface, border: `2px solid ${voiceState === "listening" ? T.red : T.accent}`, cursor: "pointer", touchAction: "none", padding: 0, fontSize: 24, display: "flex", alignItems: "center", justifyContent: "center", color: voiceState === "listening" ? "#fff" : T.text, boxShadow: voiceState === "listening" ? `0 8px 30px ${T.red}66` : `0 4px 20px ${T.accent}33`, animation: voiceState === "listening" ? "vpulse 1s ease-in-out infinite" : "none" }}>{voiceState === "parsing" ? "⏳" : <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" y1="19" x2="12" y2="22" /></svg>}</button>
+          <button data-fab="add" title="Add expense (drag to move)" style={{ width: FAB_SIZE, height: FAB_SIZE, borderRadius: "50%", background: T.accent, border: "none", cursor: "pointer", touchAction: "none", padding: 0, fontSize: 28, fontWeight: 900, color: T.bg, boxShadow: `0 8px 30px ${T.accent}66`, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
         </div>
       )}
       {isNav && (
