@@ -256,14 +256,15 @@ function addDays(iso, days) {
   const p = (x) => String(x).padStart(2, "0");
   return `${dt.getFullYear()}-${p(dt.getMonth() + 1)}-${p(dt.getDate())}`;
 }
-// DISPLAY side: turn a stored ISO date into a readable local label ("Jul 18, 2026").
+// DISPLAY side: turn a stored ISO date into MM-DD-YYYY ("07-18-2026").
 // Parsed at LOCAL midnight (iso + "T00:00:00") so it never shows the day before in
 // negative-UTC-offset zones. Stored values/queries stay ISO; only the render changes.
-function formatDate(iso, opts) {
+function formatDate(iso) {
   if (!iso) return "";
   const d = new Date(iso + "T00:00:00");
   if (isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString("en-US", opts || { month: "short", day: "numeric", year: "numeric" });
+  const p = (x) => String(x).padStart(2, "0");
+  return `${p(d.getMonth() + 1)}-${p(d.getDate())}-${d.getFullYear()}`;
 }
 const catById = (id) => CATEGORIES.find(c => c.id === id) || CATEGORIES[11];
 const uid = () => Date.now() + Math.floor(Math.random() * 10000);
@@ -298,6 +299,15 @@ function AlertBanner({ children, color = T.orange, icon = "⚠️" }) { return <
 function SegmentedControl({ options, value, onChange, colors }) { return <div style={{ display: "flex", background: T.bg, borderRadius: 10, padding: 3, gap: 2 }}>{options.map(o => <button key={o} onClick={() => onChange(o)} style={{ flex: 1, padding: "8px 4px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 11, fontWeight: 700, background: value === o ? (colors?.[o] || T.accent) + "30" : "transparent", color: value === o ? (colors?.[o] || T.accent) : T.textDim }}>{o}</button>)}</div>; }
 function ToggleChip({ label, active, onToggle, activeColor = T.accent }) { return <button onClick={onToggle} style={{ flex: 1, padding: "11px", borderRadius: 12, cursor: "pointer", fontWeight: 700, fontSize: 13, background: active ? activeColor + "22" : T.card, color: active ? activeColor : T.textMid, border: `1px solid ${active ? activeColor + "66" : T.border}` }}>{label}</button>; }
 function BackButton({ onClick, label = "Back" }) { return <button onClick={onClick} style={{ color: T.accent, background: "none", border: "none", fontSize: 14, cursor: "pointer", fontWeight: 600, marginBottom: 16, padding: 0 }}>← {label}</button>; }
+// Brand mark for the in-app header: /favicon.png, always pinned, never removed —
+// if it 404s we swap to an "M" badge (matches SiteHeader on the marketing site).
+function HeaderLogo({ size = 24 }) {
+  const [ok, setOk] = useState(true);
+  const box = { width: size, height: size, borderRadius: 6, flexShrink: 0, display: "block" };
+  return ok
+    ? <img src="/favicon.png" alt="MyTripMoney" width={size} height={size} style={box} onError={() => setOk(false)} />
+    : <span aria-hidden="true" style={{ ...box, display: "flex", alignItems: "center", justifyContent: "center", background: T.accent, color: T.bg, fontWeight: 900, fontSize: Math.round(size * 0.6), lineHeight: 1 }}>M</span>;
+}
 const inputStyle = { width: "100%", background: T.card, border: `1px solid ${T.border}`, borderRadius: 12, padding: "13px 14px", color: T.text, fontSize: 15, boxSizing: "border-box", outline: "none", fontFamily: "inherit" };
 function InputRow({ label, children }) { return <div style={{ marginBottom: 14 }}><div style={{ color: T.textMid, fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>{label}</div>{children}</div>; }
 
@@ -518,18 +528,17 @@ function CreateTripScreen({ onSave, onBack, isPro, onPaywall, prefill = null }) 
   const [form, setForm] = useState(() => prefill ? {
     name: `${prefill.destination || ""} ${new Date().getFullYear()}`.trim(),
     destination: prefill.destination || "",
-    country: prefill.countryCode || "",
     departureDate: "",
     returnDate: "",
     budget: prefill.budget ? String(prefill.budget) : "",
     currency: prefill.currency || "USD",
-  } : { name: "", destination: "", country: "", departureDate: "", returnDate: "", budget: "", currency: "USD" });
-  const [legs, setLegs] = useState([{ id: 1, from: "", to: "", country: "", departureDate: "", returnDate: "", budget: "", currency: "USD" }]);
+  } : { name: "", destination: "", departureDate: "", returnDate: "", budget: "", currency: "USD" });
+  const [legs, setLegs] = useState([{ id: 1, from: "", to: "", departureDate: "", returnDate: "", budget: "", currency: "USD" }]);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const addLeg = () => {
     const lastLeg = legs[legs.length - 1];
-    setLegs(l => [...l, { id: uid(), from: lastLeg.to, to: "", country: "", departureDate: lastLeg.returnDate, returnDate: "", budget: "", currency: lastLeg.currency }]);
+    setLegs(l => [...l, { id: uid(), from: lastLeg.to, to: "", departureDate: lastLeg.returnDate, returnDate: "", budget: "", currency: lastLeg.currency }]);
   };
   const removeLeg = (id) => {
     setLegs(prev => {
@@ -557,7 +566,7 @@ function CreateTripScreen({ onSave, onBack, isPro, onPaywall, prefill = null }) 
   if (tripType === null) {
     return (
       <div style={{ minHeight: "100vh", padding: "40px 20px 60px", display: "flex", flexDirection: "column" }}>
-        {onBack && <BackButton onClick={onBack} label="Back to Trip" />}
+        {onBack && <BackButton onClick={onBack} label="Back" />}
         <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
           <div style={{ fontSize: 28, fontWeight: 900, color: T.text, marginBottom: 6, textAlign: "center" }}>What kind of trip?</div>
           <div style={{ color: T.textMid, fontSize: 14, marginBottom: 40, textAlign: "center" }}>This helps us set up the right tracking for you.</div>
@@ -579,7 +588,7 @@ function CreateTripScreen({ onSave, onBack, isPro, onPaywall, prefill = null }) 
   }
 
   if (tripType === "single") {
-    const ok = form.name && form.destination && form.country && form.departureDate && form.returnDate && form.budget;
+    const ok = form.name && form.destination && form.departureDate && form.returnDate && form.budget;
     return (
       <div style={{ minHeight: "100vh", padding: "40px 20px 60px" }}>
         {(prefill ? onBack : true) && <BackButton onClick={prefill ? onBack : () => setTripType(null)} label="Back" />}
@@ -593,14 +602,8 @@ function CreateTripScreen({ onSave, onBack, isPro, onPaywall, prefill = null }) 
           </div>
         )}
         <InputRow label="Trip Name"><input value={form.name} onChange={e => set("name", e.target.value)} placeholder="e.g. Puerto Rico 2025" style={inputStyle} /></InputRow>
+        <InputRow label="Destination"><input value={form.destination} onChange={e => set("destination", e.target.value)} placeholder="e.g. San Juan" style={inputStyle} /></InputRow>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <InputRow label="Destination"><input value={form.destination} onChange={e => set("destination", e.target.value)} placeholder="e.g. San Juan" style={inputStyle} /></InputRow>
-          <InputRow label="Country">
-            <select value={form.country} onChange={e => set("country", e.target.value)} style={{ ...inputStyle, appearance: "auto" }}>
-              <option value="">Select country...</option>
-              {COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.flag} {c.name}</option>)}
-            </select>
-          </InputRow>
           <InputRow label="Departure"><input type="date" value={form.departureDate} min={localToday()} onChange={e => { const v = e.target.value; set("departureDate", v); if (form.returnDate && v > form.returnDate) set("returnDate", v); }} style={inputStyle} /></InputRow>
           <InputRow label="Return"><input type="date" value={form.returnDate} min={form.departureDate || undefined} onChange={e => set("returnDate", e.target.value)} style={inputStyle} /></InputRow>
         </div>
@@ -609,7 +612,7 @@ function CreateTripScreen({ onSave, onBack, isPro, onPaywall, prefill = null }) 
         <InputRow label={`Budget (${form.currency})`}>
           <div style={{ position: "relative" }}><span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: T.textMid, fontWeight: 700 }}>{curByCode(form.currency).symbol}</span><MoneyInput value={form.budget} currency={form.currency} onChange={v => set("budget", v)} style={{ ...inputStyle, paddingLeft: 36 }} /></div>
         </InputRow>
-        <button disabled={!ok} onClick={() => onSave({ ...form, budget: parseFloat(form.budget) || 0, isMultiLeg: false, legs: [{ id: 1, from: "Home", to: form.destination, country: form.country, departureDate: form.departureDate, returnDate: form.returnDate, budget: parseFloat(form.budget) || 0, currency: form.currency }] })} style={{ width: "100%", background: ok ? T.accent : T.border, color: ok ? T.bg : T.textDim, border: "none", borderRadius: 14, padding: 16, fontSize: 17, fontWeight: 900, cursor: ok ? "pointer" : "not-allowed", marginTop: 10 }}>Start Tracking →</button>
+        <button disabled={!ok} onClick={() => onSave({ ...form, budget: parseFloat(form.budget) || 0, isMultiLeg: false, legs: [{ id: 1, from: "Home", to: form.destination, departureDate: form.departureDate, returnDate: form.returnDate, budget: parseFloat(form.budget) || 0, currency: form.currency }] })} style={{ width: "100%", background: ok ? T.accent : T.border, color: ok ? T.bg : T.textDim, border: "none", borderRadius: 14, padding: 16, fontSize: 17, fontWeight: 900, cursor: ok ? "pointer" : "not-allowed", marginTop: 10 }}>Start Tracking →</button>
       </div>
     );
   }
@@ -620,7 +623,7 @@ function CreateTripScreen({ onSave, onBack, isPro, onPaywall, prefill = null }) 
   const firstDate = allDates[0] || "";
   const lastDate = allDates[allDates.length - 1] || "";
   const multiName = form.name || (legs.length > 0 ? legs.map(l => l.to).filter(Boolean).join(" → ") : "My Trip");
-  const okMulti = form.name && legs.every(l => l.from && l.to && l.country && l.departureDate && l.returnDate && l.budget) && legs.length >= 2;
+  const okMulti = form.name && legs.every(l => l.from && l.to && l.departureDate && l.returnDate && l.budget) && legs.length >= 2;
 
   return (
     <div style={{ minHeight: "100vh", padding: "40px 20px 60px" }}>
@@ -648,13 +651,6 @@ function CreateTripScreen({ onSave, onBack, isPro, onPaywall, prefill = null }) 
             <div><div style={{ color: T.textDim, fontSize: 10, fontWeight: 600, marginBottom: 4 }}>TO</div><input value={leg.to} onChange={e => updateLeg(leg.id, "to", e.target.value)} placeholder="e.g. Cuba" style={{ ...inputStyle, padding: "10px 12px", fontSize: 13 }} /></div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
-            <div style={{ gridColumn: "1 / -1", marginBottom: 4 }}>
-              <div style={{ color: T.textDim, fontSize: 10, fontWeight: 600, marginBottom: 4 }}>COUNTRY</div>
-              <select value={leg.country || ""} onChange={e => updateLeg(leg.id, "country", e.target.value)} style={{ ...inputStyle, padding: "10px 12px", fontSize: 13, appearance: "auto", width: "100%" }}>
-                <option value="">Select country...</option>
-                {COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.flag} {c.name}</option>)}
-              </select>
-            </div>
             <div><div style={{ color: T.textDim, fontSize: 10, fontWeight: 600, marginBottom: 4 }}>DEPART {lockedDepart && "🔒"}</div><input type="date" value={leg.departureDate} min={localToday()} onChange={e => { if (!lockedDepart) { const v = e.target.value; updateLeg(leg.id, "departureDate", v); if (leg.returnDate && v > leg.returnDate) updateLeg(leg.id, "returnDate", v); } }} readOnly={lockedDepart} style={{ ...inputStyle, padding: "10px 12px", fontSize: 13, opacity: lockedDepart ? 0.6 : 1, cursor: lockedDepart ? "not-allowed" : "text" }} /></div>
             <div><div style={{ color: T.textDim, fontSize: 10, fontWeight: 600, marginBottom: 4 }}>{i === legs.length - 1 && legs.length >= 2 ? "ARRIVE HOME" : "LEAVE TO"}</div><input type="date" value={leg.returnDate} min={leg.departureDate || undefined} onChange={e => updateLeg(leg.id, "returnDate", e.target.value)} style={{ ...inputStyle, padding: "10px 12px", fontSize: 13 }} /></div>
           </div>
@@ -750,8 +746,6 @@ function DashboardScreen({ expenses, trip, setScreen, setSelectedExpense }) {
   const byCat = CATEGORIES.map(c => ({ ...c, total: filteredExp.filter(e => e.category === c.id).reduce((s, e) => s + e.amount, 0) })).filter(c => c.total > 0).sort((a, b) => b.total - a.total);
   const topCat = byCat[0];
   const dueSoon = filteredExp.filter(e => e.status === "pending" || e.status === "partial");
-  const unplannedTotal = filteredExp.filter(e => !e.planned).reduce((s, e) => s + e.amount, 0);
-  const [grade, gradeColor] = tripHealthGrade(usedPct, total ? (unplannedTotal / total) * 100 : 0, total ? (pending / total) * 100 : 0);
 
   const activeLegData = trip.legs.find(l => l.id === activeLeg);
   const headerName = activeLeg === "all" ? trip.name : `${activeLegData?.from} → ${activeLegData?.to}`;
@@ -762,9 +756,8 @@ function DashboardScreen({ expenses, trip, setScreen, setSelectedExpense }) {
         <div>
           <div style={{ color: T.textMid, fontSize: 12, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase" }}>{trip.isMultiLeg ? "Multi-Leg Trip" : "Active Trip"}</div>
           <div style={{ color: T.text, fontSize: 20, fontWeight: 900 }}>{headerName}</div>
-          <div style={{ color: T.textMid, fontSize: 12 }}>{activeDep} → {activeRet} · {tripDays}d · {curByCode(tc).flag} {tc}</div>
+          <div style={{ color: T.textMid, fontSize: 12 }}>{formatDate(activeDep)} → {formatDate(activeRet)} · {tripDays}d · {curByCode(tc).flag} {tc}</div>
         </div>
-        {expenses.length > 0 && <div title="Budget Health Grade" style={{ width: 36, height: 36, borderRadius: 10, background: gradeColor + "22", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 900, color: gradeColor, border: `2px solid ${gradeColor}44` }}>{grade}</div>}
       </div>
 
       <LegSelector trip={trip} activeLegId={activeLeg} onChange={setActiveLeg} />
@@ -1044,12 +1037,96 @@ function BudgetScreen({ expenses, trip }) {
   );
 }
 
+// ─── DONUT (Spending Breakdown) ───────────────────────────────────
+// Ported from WadWall's Report donut: hand-built inline-SVG (no chart lib),
+// center total + collision-avoided callouts, thin slices fall to the legend.
+// Kept verbatim except it renders with MyTripMoney's dark theme + currency.
+const DONUT_COLORS = ["#2a78d6", "#1baf7a", "#eda100", "#008300", "#4a3aa7", "#e34948", "#0e9488", "#a83279"];
+const DONUT_OTHER = "#a8a29e";
+// Slices at/above this % get a direct callout ON the donut; thinner ones carry no
+// external label and appear only in the trimmed legend (so there's zero duplication).
+const DONUT_LABEL_MIN = 8;
+
+// Collapse a descending-sorted [{label, value}] list into ≤9 slices: the top 8 by
+// amount get palette colors in order; any remainder merges into a single grouped
+// bucket labeled "Everything else" (NOT "Other" — that's a real category name).
+function donutSlices(rows) {
+  const clean = rows.map(r => ({ label: r.label, value: Number(r.value) || 0 })).filter(r => r.value > 0);
+  const top = clean.slice(0, 8).map((r, i) => ({ ...r, color: DONUT_COLORS[i] }));
+  const restVal = clean.slice(8).reduce((s, r) => s + r.value, 0);
+  const slices = restVal > 0 ? [...top, { label: "Everything else", value: restVal, color: DONUT_OTHER }] : top;
+  const total = slices.reduce((s, r) => s + r.value, 0);
+  return { slices: slices.map(s => ({ ...s, pct: total ? (s.value / total) * 100 : 0 })), total };
+}
+
+// Hand-built inline-SVG donut — no chart library, no <canvas> — so it survives the
+// Save-as-PDF / Print flow. Returns an SVG markup string used via dangerouslySetInnerHTML.
+// Slices ≥ LABEL_MIN% get a compact stacked callout (name / amount · %) just outside the
+// ring; thinner slices carry no external label and live only in the legend. Callouts are
+// collision-avoided per side (pushed apart vertically) with short leader lines.
+function donutSVG(slices, centerTop, centerSub, ink, inkDim, sym = "$") {
+  const W = 400, H = 264, cx = W / 2, cy = H / 2, rOuter = 74, rInner = 45;
+  const LABEL_MIN = DONUT_LABEL_MIN;
+  const NAME_FS = 14, DETAIL_FS = 12, LINE_DY = NAME_FS + 1;
+  const esc = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const money = (v) => `${sym}${Math.round(v).toLocaleString()}`;
+  const pt = (r, a) => [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+  const single = slices.length === 1;
+  let cum = -Math.PI / 2, wedges = "";
+  const cand = [];
+  slices.forEach(s => {
+    const frac = s.pct / 100, start = cum, end = cum + frac * 2 * Math.PI, mid = (start + end) / 2;
+    cum = end;
+    if (single) {
+      wedges += `<circle cx="${cx}" cy="${cy}" r="${(rOuter + rInner) / 2}" fill="none" stroke="${s.color}" stroke-width="${rOuter - rInner}"/>`;
+    } else {
+      const large = frac > 0.5 ? 1 : 0;
+      const [ox1, oy1] = pt(rOuter, start), [ox2, oy2] = pt(rOuter, end);
+      const [ix2, iy2] = pt(rInner, end), [ix1, iy1] = pt(rInner, start);
+      wedges += `<path d="M ${ox1.toFixed(2)} ${oy1.toFixed(2)} A ${rOuter} ${rOuter} 0 ${large} 1 ${ox2.toFixed(2)} ${oy2.toFixed(2)} L ${ix2.toFixed(2)} ${iy2.toFixed(2)} A ${rInner} ${rInner} 0 ${large} 0 ${ix1.toFixed(2)} ${iy1.toFixed(2)} Z" fill="${s.color}" stroke="${T.card}" stroke-width="2" stroke-linejoin="round"/>`;
+    }
+    if (s.pct >= LABEL_MIN) {
+      const right = Math.cos(mid) >= 0;
+      cand.push({ mid, right, idealY: cy + (rOuter + 8) * Math.sin(mid), name: esc(s.label).slice(0, 18), detail: `${money(s.value)} · ${Math.round(s.pct)}%` });
+    }
+  });
+
+  const GAP = Math.round(NAME_FS * 0.72 + LINE_DY + DETAIL_FS * 0.25 + 6), TOP = 16, BOT = H - 16;
+  const layout = (arr) => {
+    arr.sort((a, b) => a.idealY - b.idealY);
+    let prev = -Infinity;
+    arr.forEach(l => { l.y = Math.max(l.idealY, prev + GAP, TOP); prev = l.y; });
+    const over = arr.length ? arr[arr.length - 1].y - BOT : 0;
+    if (over > 0) { let p = Infinity; for (let i = arr.length - 1; i >= 0; i--) { arr[i].y = Math.min(arr[i].y - over, p - GAP); p = arr[i].y; } }
+    return arr;
+  };
+  const rightCol = layout(cand.filter(c => c.right));
+  const leftCol = layout(cand.filter(c => !c.right));
+
+  let labels = "";
+  const draw = (l) => {
+    const colX = l.right ? cx + rOuter + 16 : cx - rOuter - 16;
+    const [p0x, p0y] = pt(rOuter, l.mid), [p1x, p1y] = pt(rOuter + 8, l.mid);
+    const endX = l.right ? colX - 3 : colX + 3;
+    const anchor = l.right ? "start" : "end";
+    labels += `<polyline points="${p0x.toFixed(1)},${p0y.toFixed(1)} ${p1x.toFixed(1)},${p1y.toFixed(1)} ${endX.toFixed(1)},${l.y.toFixed(1)}" fill="none" stroke="${inkDim}" stroke-width="0.75"/>`;
+    const nameY = l.y - 3, detailY = l.y - 3 + LINE_DY;
+    labels += `<text x="${colX.toFixed(1)}" y="${nameY.toFixed(1)}" text-anchor="${anchor}" font-size="${NAME_FS}" font-weight="800" fill="${ink}">${l.name}</text>`;
+    labels += `<text x="${colX.toFixed(1)}" y="${detailY.toFixed(1)}" text-anchor="${anchor}" font-size="${DETAIL_FS}" font-weight="600" fill="${inkDim}">${l.detail}</text>`;
+  };
+  rightCol.forEach(draw); leftCol.forEach(draw);
+
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Spending by category" style="max-width:380px;display:block;margin:0 auto;height:auto">${wedges}<text x="${cx}" y="${cy - 2}" text-anchor="middle" font-size="23" font-weight="900" fill="${ink}">${esc(centerTop)}</text><text x="${cx}" y="${cy + 15}" text-anchor="middle" font-size="11" font-weight="600" fill="${inkDim}">${esc(centerSub)}</text>${labels}</svg>`;
+}
+
 // ─── REPORTS ──────────────────────────────────────────────────────
 function ReportsScreen({ expenses, trip, setScreen }) {
-  const tc = trip.currency; const total = expenses.reduce((s, e) => s + (e.status !== "refund" ? e.amount : -Math.abs(e.amount)), 0); const paid = expenses.filter(e => e.status === "paid").reduce((s, e) => s + e.amount, 0); const pending = expenses.filter(e => e.status === "pending" || e.status === "partial").reduce((s, e) => s + e.amount, 0); const planned = expenses.filter(e => e.planned).reduce((s, e) => s + e.amount, 0); const unplanned = expenses.filter(e => !e.planned).reduce((s, e) => s + e.amount, 0); const tripDays = daysBetween(trip.departureDate, trip.returnDate);
+  const tc = trip.currency; const total = expenses.reduce((s, e) => s + (e.status !== "refund" ? e.amount : -Math.abs(e.amount)), 0); const paid = expenses.filter(e => e.status === "paid").reduce((s, e) => s + e.amount, 0); const pending = expenses.filter(e => e.status === "pending" || e.status === "partial").reduce((s, e) => s + e.amount, 0); const tripDays = daysBetween(trip.departureDate, trip.returnDate);
   const byDay = {}; expenses.forEach(e => { byDay[e.date] = (byDay[e.date] || 0) + e.amount; }); const dayEntries = Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b)); const maxDay = Math.max(...Object.values(byDay), 1);
   const byCat = CATEGORIES.map(c => ({ ...c, value: expenses.filter(e => e.category === c.id).reduce((s, e) => s + e.amount, 0) })).filter(c => c.value > 0).sort((a, b) => b.value - a.value);
-  const stats = [{ l: "Total", v: fmtCur(total, tc), c: T.accent }, { l: "Budget", v: fmtCur(trip.budget, tc), c: T.textMid }, { l: "Variance", v: fmtCur(trip.budget - total, tc), c: trip.budget - total >= 0 ? T.green : T.red }, { l: "Avg/Day", v: fmtCur(total / tripDays, tc), c: T.yellow }, { l: "Paid", v: fmtCur(paid, tc), c: T.green }, { l: "Pending", v: fmtCur(pending, tc), c: T.orange }, { l: "Planned", v: fmtCur(planned, tc), c: T.purple }, { l: "Unplanned", v: fmtCur(unplanned, tc), c: T.red }];
+  const donut = donutSlices(byCat.map(c => ({ label: `${c.icon} ${c.label}`, value: c.value })));
+  const donutCenter = `${curByCode(tc).symbol}${fmtNum(donut.total, tc)}`;
+  const stats = [{ l: "Total", v: fmtCur(total, tc), c: T.accent }, { l: "Budget", v: fmtCur(trip.budget, tc), c: T.textMid }, { l: "Variance", v: fmtCur(trip.budget - total, tc), c: trip.budget - total >= 0 ? T.green : T.red }, { l: "Avg/Day", v: fmtCur(total / tripDays, tc), c: T.yellow }, { l: "Paid", v: fmtCur(paid, tc), c: T.green }, { l: "Pending", v: fmtCur(pending, tc), c: T.orange }];
   return (
     <div style={{ padding: "20px 16px 100px" }}>
       <div style={{ color: T.text, fontSize: 22, fontWeight: 900, marginBottom: 20 }}>Report</div>
@@ -1058,17 +1135,15 @@ function ReportsScreen({ expenses, trip, setScreen }) {
         <div style={{ color: T.textMid, fontSize: 12, fontWeight: 700, textTransform: "uppercase", marginBottom: 14 }}>Daily Spending</div>
         <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 90 }}>{dayEntries.map(([d, a]) => <div key={d} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}><div style={{ fontSize: 8, color: T.textDim, fontWeight: 700 }}>{curByCode(tc).symbol}{Math.round(a)}</div><div style={{ width: "100%", height: Math.max(4, (a / maxDay) * 70), background: T.accent, borderRadius: "3px 3px 1px 1px", opacity: 0.85 }} /><div style={{ fontSize: 8, color: T.textDim }}>{d.slice(5)}</div></div>)}</div>
       </Card>
-      <Card style={{ marginBottom: 16 }}>
-        <div style={{ color: T.textMid, fontSize: 12, fontWeight: 700, textTransform: "uppercase", marginBottom: 14 }}>Categories</div>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <DonutChart data={byCat} size={120} />
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 5 }}>{byCat.slice(0, 6).map(c => <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 6 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: c.color }} /><span style={{ color: T.textMid, fontSize: 11, flex: 1 }}>{c.label}</span><span style={{ color: T.text, fontSize: 11, fontWeight: 700 }}>{fmtCur(c.value, tc)}</span></div>)}</div>
-        </div>
-      </Card>
-      <Card style={{ marginBottom: 16 }}>
-        <div style={{ color: T.textMid, fontSize: 12, fontWeight: 700, textTransform: "uppercase", marginBottom: 14 }}>Planned vs Unplanned</div>
-        <div style={{ display: "flex", gap: 12 }}>{[[planned, "Planned", T.purple], [unplanned, "Unplanned", T.orange]].map(([v, l, c]) => <div key={l} style={{ flex: 1 }}><div style={{ color: c, fontSize: 20, fontWeight: 900 }}>{fmtCur(v, tc)}</div><div style={{ color: T.textDim, fontSize: 11 }}>{l} ({total > 0 ? Math.round(pct(v, total)) : 0}%)</div><div style={{ marginTop: 6 }}><ProgressBar value={total > 0 ? pct(v, total) : 0} color={c} height={6} /></div></div>)}</div>
-      </Card>
+      {donut.slices.length > 0 && (
+        <Card style={{ marginBottom: 16 }}>
+          <div style={{ color: T.textMid, fontSize: 12, fontWeight: 700, textTransform: "uppercase", marginBottom: 10 }}>Spending Breakdown</div>
+          <div dangerouslySetInnerHTML={{ __html: donutSVG(donut.slices, donutCenter, "spent", T.text, T.textDim, curByCode(tc).symbol) }} />
+          {donut.slices.some(s => s.pct < DONUT_LABEL_MIN) && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 12 }}>{donut.slices.filter(s => s.pct < DONUT_LABEL_MIN).map(s => <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}><span style={{ width: 12, height: 12, borderRadius: 3, background: s.color, flexShrink: 0 }} /><span style={{ flex: 1, color: T.textMid }}>{s.label}</span><span style={{ color: T.text, fontWeight: 700 }}>{fmtCur(s.value, tc)}</span><span style={{ width: 44, textAlign: "right", color: T.textDim, fontWeight: 700 }}>{Math.round(s.pct)}%</span></div>)}</div>
+          )}
+        </Card>
+      )}
       <button onClick={() => setScreen("email-report")} style={{ width: "100%", background: T.accent, color: T.bg, border: "none", borderRadius: 14, padding: 15, fontSize: 16, fontWeight: 900, cursor: "pointer" }}>📤 Share Report</button>
     </div>
   );
@@ -1303,7 +1378,7 @@ function TripsListScreen({ user, currentTripDbId, onSelectTrip, onNewTrip, onBac
                   {isActive && <span style={{ background: T.accent, color: T.bg, fontSize: 9, fontWeight: 900, padding: "2px 6px", borderRadius: 6, letterSpacing: 0.5 }}>ACTIVE</span>}
                 </div>
                 <div style={{ color: T.textMid, fontSize: 12 }}>{(t.country ? countryByCode(t.country).flag : cur.flag)} {t.isMultiLeg ? `${t.legs.length} legs` : t.destination}</div>
-                <div style={{ color: T.textDim, fontSize: 11, marginTop: 2 }}>{t.departureDate} → {t.returnDate}</div>
+                <div style={{ color: T.textDim, fontSize: 11, marginTop: 2 }}>{formatDate(t.departureDate)} → {formatDate(t.returnDate)}</div>
               </div>
               <div style={{ textAlign: "right" }}>
                 <div style={{ color: T.text, fontSize: 14, fontWeight: 900 }}>{cur.symbol}{spent.toFixed(0)}</div>
@@ -1633,7 +1708,7 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
     <div style={{ fontFamily: "'DM Sans', 'SF Pro Display', -apple-system, sans-serif", background: T.bg, color: T.text, maxWidth: 390, margin: "0 auto", minHeight: "100vh", position: "relative", overflowX: "hidden" }}>
       {screen !== "welcome" && screen !== "create-trip" && (
         <div style={{ position: "sticky", top: 0, zIndex: 50, background: T.bg + "EE", backdropFilter: "blur(12px)", borderBottom: `1px solid ${T.border}`, padding: "10px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ display: "flex", gap: 4, alignItems: "center" }}><span style={{ fontSize: 18, fontWeight: 900, color: T.text }}>My</span><span style={{ fontSize: 18, fontWeight: 900, color: T.accent }}>Trip</span><span style={{ fontSize: 18, fontWeight: 900, color: T.text }}>Money</span></div>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexShrink: 0 }}><HeaderLogo size={24} /><span style={{ fontSize: 18, fontWeight: 900, whiteSpace: "nowrap" }}><span style={{ color: T.text }}>My</span><span style={{ color: T.accent }}>Trip</span><span style={{ color: T.text }}>Money</span></span></div>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             <span style={{ color: T.textMid, fontSize: 12, display: "inline-block", maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(trip.country ? countryByCode(trip.country).flag : curByCode(trip.currency).flag)} {trip.isMultiLeg ? `${trip.legs.length} legs` : trip.destination}</span>
             <button onClick={() => setScreen("trips-list")} title="My Trips" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, padding: 0, color: T.textDim }}>🔄</button>
@@ -1644,7 +1719,7 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
       )}
       <div>
         {screen === "welcome" && <WelcomeScreen onStart={() => { setTrip(DEFAULT_TRIP); setExpenses(SEED_EXPENSES); setScreen("dashboard"); }} onCreateTrip={() => setScreen("create-trip")} onInstall={onInstall} isInstalled={isInstalled} canInstall={canInstall} isIOS={isIOS} isMobile={isMobile} isPro={isPro} onPaywall={onPaywall} user={user} />}
-        {screen === "create-trip" && <CreateTripScreen onSave={t => { setTrip(t); setExpenses([]); setPendingPrefill(null); setScreen("dashboard"); }} onBack={trip && trip.name && expenses.length >= 0 ? () => { setPendingPrefill(null); setScreen("dashboard"); } : null} isPro={isPro} onPaywall={onPaywall} prefill={pendingPrefill} />}
+        {screen === "create-trip" && <CreateTripScreen onSave={t => { setTrip(t); setExpenses([]); setPendingPrefill(null); setScreen("dashboard"); }} onBack={() => { setPendingPrefill(null); setScreen(trip && trip.name ? "dashboard" : "welcome"); }} isPro={isPro} onPaywall={onPaywall} prefill={pendingPrefill} />}
         {screen === "dashboard" && <DashboardScreen expenses={expenses} trip={trip} setScreen={setScreen} setSelectedExpense={setSelectedExpense} />}
         {screen === "history" && <HistoryScreen expenses={expenses} trip={trip} setScreen={setScreen} setSelectedExpense={setSelectedExpense} onEdit={handleEdit} />}
         {screen === "add" && <AddExpenseScreen onSave={addExpense} onBack={() => { setVoicePrefill(null); setVoiceNote(null); setScreen("dashboard"); }} trip={trip} prefill={voicePrefill} note={voiceNote} />}
