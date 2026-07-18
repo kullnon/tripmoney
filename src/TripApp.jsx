@@ -686,14 +686,16 @@ function CreateTripScreen({ onSave, onBack, isPro, onPaywall, prefill = null }) 
 function QuickAddSheet({ onSave, onFullForm, onClose, trip }) {
   const [cat, setCat] = useState("food");
   const [amount, setAmount] = useState("");
+  const [payment, setPayment] = useState("💳 Credit Card");
+  const [location, setLocation] = useState("");
   const [saved, setSaved] = useState(false);
   const todayStr = localToday();
   const phase = autoPhase(todayStr, trip.departureDate, trip.returnDate);
   const legId = autoLeg(todayStr, trip.legs);
   const handleSave = () => {
     if (!amount) return;
-    onSave({ id: uid(), title: catById(cat).label, amount: parseFloat(amount) || 0, category: cat, phase, date: todayStr, payment: "💳 Credit Card", status: "paid", planned: false, notes: "", refundable: false, shared: false, sharedCount: 1, estimated: 0, isDailySummary: false, originalAmount: parseFloat(amount) || 0, originalCurrency: trip.currency, exchangeRate: 1, legId });
-    setSaved(true); setTimeout(() => { setSaved(false); setAmount(""); }, 1200);
+    onSave({ id: uid(), title: catById(cat).label, amount: parseNum(amount, trip.currency) || 0, category: cat, phase, date: todayStr, payment, location: location.trim() || null, status: "paid", planned: false, notes: "", refundable: false, shared: false, sharedCount: 1, estimated: 0, isDailySummary: false, originalAmount: parseNum(amount, trip.currency) || 0, originalCurrency: trip.currency, exchangeRate: 1, legId });
+    setSaved(true); setTimeout(() => { setSaved(false); setAmount(""); setLocation(""); }, 1200);
   };
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
@@ -714,6 +716,10 @@ function QuickAddSheet({ onSave, onFullForm, onClose, trip }) {
         </div>
         <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap", justifyContent: "center" }}>
           {[10, 20, 50, 100, 200].map(n => <button key={n} onClick={() => setAmount(String(n))} style={{ padding: "8px 18px", background: T.card, border: `1px solid ${T.border}`, borderRadius: 99, color: T.textMid, fontSize: 14, cursor: "pointer", fontWeight: 700 }}>{curByCode(trip.currency).symbol}{n}</button>)}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
+          <div><div style={{ color: T.textMid, fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>Payment</div><select value={payment} onChange={e => setPayment(e.target.value)} style={{ ...inputStyle, fontSize: 13 }}>{PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}</select></div>
+          <div><div style={{ color: T.textMid, fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>Location</div><input value={location} onChange={e => setLocation(e.target.value)} placeholder="optional" maxLength={80} style={{ ...inputStyle, fontSize: 13 }} /></div>
         </div>
         {trip.isMultiLeg && <div style={{ color: T.textDim, fontSize: 12, textAlign: "center", marginBottom: 8 }}>Auto-assigned to: {trip.legs.find(l => l.id === legId)?.from}→{trip.legs.find(l => l.id === legId)?.to}</div>}
         <button onClick={handleSave} style={{ width: "100%", background: amount ? T.accent : T.border, color: amount ? T.bg : T.textDim, border: "none", borderRadius: 14, padding: 16, fontSize: 17, fontWeight: 900, cursor: amount ? "pointer" : "not-allowed" }}>Save Expense</button>
@@ -830,7 +836,7 @@ function DashboardScreen({ expenses, trip, setScreen, setSelectedExpense }) {
           <button onClick={() => setScreen("history")} style={{ color: T.accent, background: "none", border: "none", fontSize: 13, cursor: "pointer", fontWeight: 600 }}>See All</button>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {filteredExp.slice(-5).reverse().map(e => {
+          {[...filteredExp].sort((a, b) => (b.created_at || b.date || "").localeCompare(a.created_at || a.date || "")).slice(0, 5).map(e => {
             const cat = catById(e.category);
             return (
               <Card key={e.id} style={{ padding: "12px 14px", display: "flex", alignItems: "center", gap: 12 }} onClick={() => { setSelectedExpense(e); setScreen("expense-detail"); }}>
@@ -855,8 +861,13 @@ function HistoryScreen({ expenses, trip, setScreen, setSelectedExpense, onEdit, 
   const tc = trip.currency;
   const [search, setSearch] = useState(""); const [filterPhase, setFilterPhase] = useState("All"); const [filterStatus, setFilterStatus] = useState("All"); const [filterLeg, setFilterLeg] = useState("All"); const [sortBy, setSortBy] = useState("date");
   let filtered = expenses.filter(e => { const ms = !search || e.title.toLowerCase().includes(search.toLowerCase()); const mp = filterPhase === "All" || e.phase === filterPhase; const mst = filterStatus === "All" || e.status === filterStatus; const ml = filterLeg === "All" || e.legId === filterLeg; return ms && mp && mst && ml; });
-  if (sortBy === "amount") filtered = [...filtered].sort((a, b) => b.amount - a.amount); else filtered = [...filtered].sort((a, b) => b.date.localeCompare(a.date));
-  const grouped = {}; filtered.forEach(e => { if (!grouped[e.date]) grouped[e.date] = []; grouped[e.date].push(e); }); const dates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+  // Order by when the expense was ADDED (created_at), NOT its expense date, so a
+  // just-added backdated entry shows at the top. Falls back to date for legacy/demo rows.
+  const ts = e => e.created_at || e.date || "";
+  if (sortBy === "amount") filtered = [...filtered].sort((a, b) => b.amount - a.amount); else filtered = [...filtered].sort((a, b) => ts(b).localeCompare(ts(a)));
+  const grouped = {}; filtered.forEach(e => { if (!grouped[e.date]) grouped[e.date] = []; grouped[e.date].push(e); });
+  const groupTs = d => grouped[d].reduce((m, e) => ts(e) > m ? ts(e) : m, "");
+  const dates = Object.keys(grouped).sort((a, b) => groupTs(b).localeCompare(groupTs(a)));
   return (
     <div style={{ padding: "20px 16px 100px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 10 }}>
@@ -1910,12 +1921,15 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
   };
 
   const addExpense = async (e) => {
-    setExpenses(p => [...p, e]);
+    // Stamp created_at locally so a just-added row (even if backdated) sorts to the top
+    // immediately; reconciled with the DB value after the insert returns.
+    const local = { ...e, created_at: e.created_at || new Date().toISOString() };
+    setExpenses(p => [...p, local]);
     if (!user?.id || !tripDbId) return;
     try {
       setSyncing(true);
-      const saved = await dbCreateExpense(user.id, tripDbId, e);
-      setExpenses(p => p.map(x => x.id === e.id ? { ...x, id: saved.id, dbId: saved.id } : x));
+      const saved = await dbCreateExpense(user.id, tripDbId, local);
+      setExpenses(p => p.map(x => x.id === local.id ? { ...x, id: saved.id, dbId: saved.id, created_at: saved.created_at || x.created_at } : x));
     } catch (err) {
       console.error("addExpense failed:", err);
       alert("Couldn't save expense. Check your connection.");

@@ -77,7 +77,7 @@ export async function fetchExpenses(tripId) {
     .from('expenses')
     .select('*')
     .eq('trip_id', tripId)
-    .order('date', { ascending: false });
+    .order('created_at', { ascending: false });
   if (error) throw error;
   return (data || []).map(e => ({
     id: e.id,
@@ -100,6 +100,7 @@ export async function fetchExpenses(tripId) {
     exchangeRate: parseFloat(e.exchange_rate) || 1,
     legId: e.leg_id,
     location: e.location || null,
+    created_at: e.created_at,
     dbId: e.id,
   }));
 }
@@ -133,7 +134,7 @@ export async function createExpense(userId, tripId, expense) {
     .select()
     .single();
   if (error) throw error;
-  return { ...expense, id: data.id, dbId: data.id };
+  return { ...expense, id: data.id, dbId: data.id, created_at: data.created_at };
 }
 
 export async function updateExpense(expenseId, expense) {
