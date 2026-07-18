@@ -267,6 +267,27 @@ function formatDate(iso) {
   return `${p(d.getMonth() + 1)}-${p(d.getDate())}-${d.getFullYear()}`;
 }
 const catById = (id) => CATEGORIES.find(c => c.id === id) || CATEGORIES[11];
+
+// ─── SMART ICONS (title keyword → emoji) ──────────────────────────
+// Reads the expense TITLE first; falls back to the category icon when no keyword
+// matches. Case-insensitive partial match, first hit wins. Edit freely to add more:
+// each entry is [ [keywords…], emoji ].
+const TITLE_ICONS = [
+  [["burger king", "mcdonald", "wendy", "whopper", "burger"], "🍔"],
+  [["home depot", "hardware", "lumber", "ikea", "lowes"], "🪚"],
+  [["uber", "lyft", "taxi", "cab"], "🚗"],
+  [["airfare", "airline", "flight", "delta", "american air", "american"], "✈️"],
+  [["macy", "shoe", "clothing", "mall"], "🛍️"],
+  [["grocery", "supermarket", "whole foods", "walmart"], "🛒"],
+  [["coffee", "starbucks", "cafe"], "☕"],
+  [["hotel", "airbnb", "motel"], "🏨"],
+];
+function iconForExpense(e) {
+  const t = (e && e.title ? e.title : "").toLowerCase();
+  if (t) for (const [keys, emoji] of TITLE_ICONS) { if (keys.some(k => t.includes(k))) return emoji; }
+  return catById(e && e.category).icon;
+}
+
 const uid = () => Date.now() + Math.floor(Math.random() * 10000);
 function pct(s, b) { return b ? Math.min(100, Math.round((s / b) * 100)) : 0; }
 function healthColor(p) { return p < 60 ? T.green : p < 85 ? T.orange : T.red; }
@@ -840,7 +861,7 @@ function DashboardScreen({ expenses, trip, setScreen, setSelectedExpense }) {
             const cat = catById(e.category);
             return (
               <Card key={e.id} style={{ padding: "12px 14px", display: "flex", alignItems: "center", gap: 12 }} onClick={() => { setSelectedExpense(e); setScreen("expense-detail"); }}>
-                <div style={{ width: 40, height: 40, borderRadius: 12, background: cat.color + "22", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>{cat.icon}</div>
+                <div style={{ width: 40, height: 40, borderRadius: 12, background: cat.color + "22", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>{iconForExpense(e)}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ color: T.text, fontSize: 14, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.title}{e.location ? <span style={{ color: T.textMid, fontWeight: 500 }}> · {e.location}</span> : null}</div>
                   <div style={{ color: T.textMid, fontSize: 11, marginTop: 2 }}>{e.payment}</div>
@@ -861,13 +882,11 @@ function HistoryScreen({ expenses, trip, setScreen, setSelectedExpense, onEdit, 
   const tc = trip.currency;
   const [search, setSearch] = useState(""); const [filterPhase, setFilterPhase] = useState("All"); const [filterStatus, setFilterStatus] = useState("All"); const [filterLeg, setFilterLeg] = useState("All"); const [sortBy, setSortBy] = useState("date");
   let filtered = expenses.filter(e => { const ms = !search || e.title.toLowerCase().includes(search.toLowerCase()); const mp = filterPhase === "All" || e.phase === filterPhase; const mst = filterStatus === "All" || e.status === filterStatus; const ml = filterLeg === "All" || e.legId === filterLeg; return ms && mp && mst && ml; });
-  // Order by when the expense was ADDED (created_at), NOT its expense date, so a
-  // just-added backdated entry shows at the top. Falls back to date for legacy/demo rows.
+  // FLAT list ordered by when each expense was ADDED (created_at DESC), NOT its expense
+  // date — so the most recently added row is always first, even if it's backdated.
+  // Falls back to date for legacy/demo rows that predate created_at.
   const ts = e => e.created_at || e.date || "";
   if (sortBy === "amount") filtered = [...filtered].sort((a, b) => b.amount - a.amount); else filtered = [...filtered].sort((a, b) => ts(b).localeCompare(ts(a)));
-  const grouped = {}; filtered.forEach(e => { if (!grouped[e.date]) grouped[e.date] = []; grouped[e.date].push(e); });
-  const groupTs = d => grouped[d].reduce((m, e) => ts(e) > m ? ts(e) : m, "");
-  const dates = Object.keys(grouped).sort((a, b) => groupTs(b).localeCompare(groupTs(a)));
   return (
     <div style={{ padding: "20px 16px 100px" }}>
       {/* Horizontal-scroll filter rows: no wrap, hidden scrollbar — nothing spills off-screen. */}
@@ -890,17 +909,15 @@ function HistoryScreen({ expenses, trip, setScreen, setSelectedExpense, onEdit, 
           {trip.legs.map((leg, i) => <button key={leg.id} onClick={() => setFilterLeg(leg.id)} style={{ flexShrink: 0, padding: "6px 12px", borderRadius: 99, fontSize: 11, fontWeight: 700, cursor: "pointer", background: filterLeg === leg.id ? LEG_COLORS[i] + "33" : T.card, color: filterLeg === leg.id ? LEG_COLORS[i] : T.textDim, border: `1px solid ${filterLeg === leg.id ? LEG_COLORS[i] : T.border}` }}>{leg.from}→{leg.to}</button>)}
         </div>
       )}
-      {dates.map(date => {
-        const dayTotal = grouped[date].reduce((s, e) => s + e.amount, 0);
-        return (<div key={date}><div style={{ display: "flex", justifyContent: "space-between", padding: "14px 0 8px" }}><div style={{ color: T.textMid, fontSize: 12, fontWeight: 700 }}>{formatDate(date)}</div><div style={{ color: T.text, fontSize: 13, fontWeight: 700 }}>{fmtCur(dayTotal, tc)}</div></div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>{grouped[date].map(e => { const cat = catById(e.category); return (
-            <Card key={e.id} style={{ padding: "12px 14px", display: "flex", alignItems: "center", gap: 12 }} onClick={() => { setSelectedExpense(e); setScreen("expense-detail"); }}>
-              <div style={{ width: 38, height: 38, borderRadius: 10, background: cat.color + "22", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>{cat.icon}</div>
-              <div style={{ flex: 1, minWidth: 0 }}><div style={{ color: T.text, fontSize: 14, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.title}{e.location ? <span style={{ color: T.textMid, fontWeight: 500 }}> · {e.location}</span> : null}</div><div style={{ color: T.textMid, fontSize: 11, marginTop: 2 }}>{e.payment}</div></div>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3 }}><div style={{ color: T.text, fontWeight: 800, fontSize: 15 }}>{fmtCur(e.amount, tc)}</div><StatusBadge status={e.status} /></div>
-              {onEdit && <button onClick={(ev) => { ev.stopPropagation(); onEdit(e); }} aria-label="Edit expense" title="Edit" style={{ background: "none", border: `1px solid ${T.border}`, borderRadius: 8, cursor: "pointer", color: T.textMid, fontSize: 15, padding: "5px 7px", flexShrink: 0, lineHeight: 1 }}>✏️</button>}
-            </Card>); })}</div></div>);
-      })}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
+        {filtered.map(e => { const cat = catById(e.category); return (
+          <Card key={e.id} style={{ padding: "12px 14px", display: "flex", alignItems: "center", gap: 12 }} onClick={() => { setSelectedExpense(e); setScreen("expense-detail"); }}>
+            <div style={{ width: 38, height: 38, borderRadius: 10, background: cat.color + "22", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>{iconForExpense(e)}</div>
+            <div style={{ flex: 1, minWidth: 0 }}><div style={{ color: T.text, fontSize: 14, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.title}{e.location ? <span style={{ color: T.textMid, fontWeight: 500 }}> · {e.location}</span> : null}</div><div style={{ color: T.textMid, fontSize: 11, marginTop: 2 }}>{formatDate(e.date)} · {e.payment}</div></div>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3 }}><div style={{ color: T.text, fontWeight: 800, fontSize: 15 }}>{fmtCur(e.amount, tc)}</div><StatusBadge status={e.status} /></div>
+            {onEdit && <button onClick={(ev) => { ev.stopPropagation(); onEdit(e); }} aria-label="Edit expense" title="Edit" style={{ background: "none", border: `1px solid ${T.border}`, borderRadius: 8, cursor: "pointer", color: T.textMid, fontSize: 15, padding: "5px 7px", flexShrink: 0, lineHeight: 1 }}>✏️</button>}
+          </Card>); })}
+      </div>
       {filtered.length === 0 && <div style={{ textAlign: "center", color: T.textDim, marginTop: 60 }}>No expenses found</div>}
     </div>
   );
@@ -916,7 +933,7 @@ function ExpenseDetailScreen({ expense, trip, setScreen, onDelete, onDuplicate, 
     <div style={{ padding: "20px 16px 100px" }}>
       <BackButton onClick={() => setScreen("history")} />
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24 }}>
-        <div style={{ width: 56, height: 56, borderRadius: 16, background: cat.color + "22", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28 }}>{cat.icon}</div>
+        <div style={{ width: 56, height: 56, borderRadius: 16, background: cat.color + "22", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28 }}>{iconForExpense(expense)}</div>
         <div><div style={{ color: T.text, fontSize: 20, fontWeight: 900 }}>{expense.title}</div><div style={{ color: cat.color, fontSize: 14, fontWeight: 600 }}>{cat.label}</div></div>
       </div>
       <Card style={{ marginBottom: 16 }}>
@@ -1145,7 +1162,7 @@ function donutSlices(rows) {
 function donutSVG(slices, centerTop, centerSub, ink, inkDim, sym = "$") {
   const W = 400, H = 264, cx = W / 2, cy = H / 2, rOuter = 74, rInner = 45;
   const LABEL_MIN = DONUT_LABEL_MIN;
-  const NAME_FS = 14, DETAIL_FS = 12, LINE_DY = NAME_FS + 1;
+  const NAME_FS = 14, DETAIL_FS = 13, LINE_DY = NAME_FS + 1;
   const esc = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const money = (v) => `${sym}${Math.round(v).toLocaleString()}`;
   const pt = (r, a) => [cx + r * Math.cos(a), cy + r * Math.sin(a)];
@@ -1190,11 +1207,16 @@ function donutSVG(slices, centerTop, centerSub, ink, inkDim, sym = "$") {
     labels += `<polyline points="${p0x.toFixed(1)},${p0y.toFixed(1)} ${p1x.toFixed(1)},${p1y.toFixed(1)} ${endX.toFixed(1)},${l.y.toFixed(1)}" fill="none" stroke="${inkDim}" stroke-width="0.75"/>`;
     const nameY = l.y - 3, detailY = l.y - 3 + LINE_DY;
     labels += `<text x="${colX.toFixed(1)}" y="${nameY.toFixed(1)}" text-anchor="${anchor}" font-size="${NAME_FS}" font-weight="800" fill="${ink}">${l.name}</text>`;
-    labels += `<text x="${colX.toFixed(1)}" y="${detailY.toFixed(1)}" text-anchor="${anchor}" font-size="${DETAIL_FS}" font-weight="600" fill="${inkDim}">${l.detail}</text>`;
+    labels += `<text x="${colX.toFixed(1)}" y="${detailY.toFixed(1)}" text-anchor="${anchor}" font-size="${DETAIL_FS}" font-weight="700" fill="${ink}">${l.detail}</text>`;
   };
   rightCol.forEach(draw); leftCol.forEach(draw);
 
-  return `<svg viewBox="0 0 ${W} ${H}" width="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Spending by category" style="max-width:380px;display:block;margin:0 auto;height:auto">${wedges}<text x="${cx}" y="${cy - 2}" text-anchor="middle" font-size="23" font-weight="900" fill="${ink}">${esc(centerTop)}</text><text x="${cx}" y="${cy + 15}" text-anchor="middle" font-size="11" font-weight="600" fill="${inkDim}">${esc(centerSub)}</text>${labels}</svg>`;
+  // Auto-fit the center total to the inner circle: big for short amounts, shrinking so a
+  // 7-digit value (e.g. $1,234,567.00) still fits without overflowing the ring.
+  const ctStr = String(centerTop);
+  const innerW = rInner * 2 * 0.86;                        // usable width inside the donut hole
+  const centerFS = Math.max(10, Math.min(24, Math.round(innerW / (ctStr.length * 0.60))));
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Spending by category" style="max-width:380px;display:block;margin:0 auto;height:auto">${wedges}<text x="${cx}" y="${cy - 2}" text-anchor="middle" font-size="${centerFS}" font-weight="900" fill="${ink}">${esc(centerTop)}</text><text x="${cx}" y="${cy + 15}" text-anchor="middle" font-size="11" font-weight="600" fill="${inkDim}">${esc(centerSub)}</text>${labels}</svg>`;
 }
 
 // ─── REPORTS ──────────────────────────────────────────────────────
@@ -1213,7 +1235,7 @@ function ReportsScreen({ expenses, trip, setScreen }) {
           <div style={{ color: T.textMid, fontSize: 12, fontWeight: 700, textTransform: "uppercase", marginBottom: 10 }}>Spending Breakdown</div>
           <div dangerouslySetInnerHTML={{ __html: donutSVG(donut.slices, donutCenter, "spent", T.text, T.textDim, curByCode(tc).symbol) }} />
           {donut.slices.some(s => s.pct < DONUT_LABEL_MIN) && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 12 }}>{donut.slices.filter(s => s.pct < DONUT_LABEL_MIN).map(s => <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}><span style={{ width: 12, height: 12, borderRadius: 3, background: s.color, flexShrink: 0 }} /><span style={{ flex: 1, color: T.textMid }}>{s.label}</span><span style={{ color: T.text, fontWeight: 700 }}>{fmtCur(s.value, tc)}</span><span style={{ width: 44, textAlign: "right", color: T.textDim, fontWeight: 700 }}>{Math.round(s.pct)}%</span></div>)}</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 12 }}>{donut.slices.filter(s => s.pct < DONUT_LABEL_MIN).map(s => <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}><span style={{ width: 12, height: 12, borderRadius: 3, background: s.color, flexShrink: 0 }} /><span style={{ flex: 1, color: T.textMid }}>{s.label}</span><span style={{ color: T.text, fontWeight: 800 }}>{fmtCur(s.value, tc)}</span><span style={{ width: 48, textAlign: "right", color: T.textMid, fontWeight: 800 }}>{Math.round(s.pct)}%</span></div>)}</div>
           )}
         </Card>
       )}
