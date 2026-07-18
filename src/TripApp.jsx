@@ -933,11 +933,66 @@ function ExpenseDetailScreen({ expense, trip, setScreen, onDelete, onDuplicate, 
   );
 }
 
+// ─── PRIOR-EXPENSE FLOW (date first, then voice) ──────────────────
+// Step 1: pick the past date BEFORE anything else. Floor = BACKDATE_LIMIT_DAYS
+// ago (matches the add form's bounds); future dates blocked. UTC-safe throughout.
+function PriorDateScreen({ onPick, onCancel }) {
+  const todayStr = localToday();
+  const floor = addDays(todayStr, -BACKDATE_LIMIT_DAYS);
+  const [date, setDate] = useState(todayStr);
+  const onChange = (v) => setDate(!v ? todayStr : v < floor ? floor : v > todayStr ? todayStr : v);
+  return (
+    <div style={{ padding: "20px 16px 100px" }}>
+      <BackButton onClick={onCancel} />
+      <div style={{ color: T.text, fontSize: 22, fontWeight: 900, marginBottom: 6 }}>📅 Add prior expense</div>
+      <div style={{ color: T.textMid, fontSize: 14, marginBottom: 24 }}>When did this purchase happen? Pick any day from {formatDate(floor)} to today — you'll add the details next.</div>
+      <Card style={{ marginBottom: 20 }}>
+        <InputRow label="Date of expense"><input type="date" value={date} min={floor} max={todayStr} onChange={e => onChange(e.target.value)} style={{ ...inputStyle, fontSize: 16 }} /></InputRow>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ color: T.accent, fontSize: 14, fontWeight: 700 }}>{date === todayStr ? "Today" : formatDate(date)}</div>
+          {date !== todayStr && <button onClick={() => setDate(todayStr)} style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMid, borderRadius: 8, padding: "4px 10px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Today</button>}
+        </div>
+      </Card>
+      <button onClick={() => onPick(date)} style={{ width: "100%", background: T.accent, color: T.bg, border: "none", borderRadius: 14, padding: 16, fontSize: 16, fontWeight: 900, cursor: "pointer" }}>Continue →</button>
+    </div>
+  );
+}
+
+// Step 2: mic front-and-center for the chosen date. Speaking saves to THAT date;
+// the full manual form stays one tap away, pre-set to the same date.
+function PriorEntryScreen({ date, voiceState, onMic, onManual, onChangeDate, onBack }) {
+  const listening = voiceState === "listening" || voiceState === "pending";
+  const parsing = voiceState === "parsing";
+  return (
+    <div style={{ padding: "20px 16px 100px" }}>
+      <style>{`@keyframes vpulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.08); opacity: 0.7; } }`}</style>
+      <BackButton onClick={onBack} />
+      <div style={{ color: T.text, fontSize: 22, fontWeight: 900, marginBottom: 6 }}>Add expense</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 28, flexWrap: "wrap" }}>
+        <span style={{ color: T.textMid, fontSize: 14 }}>Logging for</span>
+        <span style={{ color: T.accent, fontSize: 18, fontWeight: 900 }}>{formatDate(date)}</span>
+        <button onClick={onChangeDate} style={{ background: "none", border: "none", color: T.accent, fontSize: 13, fontWeight: 700, cursor: "pointer", textDecoration: "underline", padding: 0 }}>Change</button>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, marginTop: 24, marginBottom: 32 }}>
+        <button onClick={onMic} title={listening ? "Tap to stop" : "Tap and speak"} style={{ width: 112, height: 112, borderRadius: "50%", background: listening ? T.red : T.surface, border: `3px solid ${listening ? T.red : T.accent}`, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: listening ? "#fff" : T.accent, boxShadow: listening ? `0 10px 40px ${T.red}66` : `0 8px 30px ${T.accent}44`, animation: listening ? "vpulse 1s ease-in-out infinite" : "none" }}>
+          {parsing ? <span style={{ fontSize: 38 }}>⏳</span> : <svg viewBox="0 0 24 24" width="46" height="46" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" y1="19" x2="12" y2="22" /></svg>}
+        </button>
+        <div style={{ color: listening ? T.red : T.textMid, fontSize: 15, fontWeight: 700, textAlign: "center" }}>{parsing ? "Processing…" : listening ? "Listening… tap to stop" : "Tap the mic and say the expense"}</div>
+        {!listening && !parsing && <div style={{ color: T.textDim, fontSize: 12, textAlign: "center", maxWidth: 280, lineHeight: 1.5 }}>e.g. “forty dollars groceries at Whole Foods, debit” — it saves to {formatDate(date)}, not today.</div>}
+      </div>
+      <button onClick={onManual} style={{ width: "100%", background: T.card, color: T.text, border: `1px solid ${T.border}`, borderRadius: 14, padding: 15, fontSize: 15, fontWeight: 700, cursor: "pointer" }}>✏️ Enter manually instead</button>
+    </div>
+  );
+}
+
 // ─── ADD/EDIT EXPENSE ─────────────────────────────────────────────
-function AddExpenseScreen({ onSave, onBack, trip, editExpense = null, prefill = null, note = null, defaultDate = null }) {
+function AddExpenseScreen({ onSave, onBack, trip, editExpense = null, prefill = null, note = null, defaultDate = null, focusDate = false }) {
   const isEdit = !!editExpense; const todayStr = localToday(); const tc = trip.currency;
   // "Add prior expense" opens here with a past defaultDate; clamped to the backdating window.
   const startDate = defaultDate ? (defaultDate > todayStr ? todayStr : defaultDate) : todayStr;
+  // Opened via the prior-expense flow's "Enter manually": scroll the date into view + emphasize it.
+  const dateRef = useRef(null);
+  useEffect(() => { if (focusDate && dateRef.current) dateRef.current.scrollIntoView({ behavior: "smooth", block: "center" }); }, [focusDate]);
   // Voice pre-fill: seed amount/category/title from the parse; everything else uses the normal defaults.
   const preAmount = (!isEdit && prefill && prefill.amount != null) ? String(prefill.amount) : "";
   const lowConf = !isEdit && !!prefill && prefill.confidence === "low";
@@ -968,7 +1023,8 @@ function AddExpenseScreen({ onSave, onBack, trip, editExpense = null, prefill = 
   return (
     <div style={{ padding: "20px 16px 100px" }}>
       <BackButton onClick={onBack} />
-      <div style={{ color: T.text, fontSize: 22, fontWeight: 900, marginBottom: 20 }}>{isEdit ? "Edit Expense" : "Add Expense"}</div>
+      <div style={{ color: T.text, fontSize: 22, fontWeight: 900, marginBottom: 20 }}>{isEdit ? "Edit Expense" : focusDate ? "Add Prior Expense" : "Add Expense"}</div>
+      {focusDate && !isEdit && <div style={{ background: T.accent + "18", border: `1px solid ${T.accent}55`, borderRadius: 12, padding: 12, marginBottom: 16, color: T.accent, fontWeight: 700, fontSize: 13, textAlign: "center" }}>🗓️ Logging for {formatDate(startDate)} — change the date below if needed.</div>}
       {saved && <div style={{ background: T.green + "22", border: `1px solid ${T.green}44`, borderRadius: 12, padding: 12, marginBottom: 16, color: T.green, fontWeight: 700, textAlign: "center" }}>✅ {isEdit ? "Updated!" : "Saved!"}</div>}
       {note && <div style={{ background: T.orange + "18", border: `1px solid ${T.orange}55`, borderRadius: 12, padding: 12, marginBottom: 16, color: T.orange, fontWeight: 700, fontSize: 13, textAlign: "center" }}>🎤 {note}</div>}
       {!isEdit && prefill && !note && <div style={{ background: (lowConf ? T.orange : T.accent) + "18", border: `1px solid ${(lowConf ? T.orange : T.accent)}55`, borderRadius: 12, padding: 12, marginBottom: 16, color: lowConf ? T.orange : T.accent, fontWeight: 700, fontSize: 13, textAlign: "center" }}>{lowConf ? "🎤 Heard it — double-check the amount & category, then save." : "🎤 Pre-filled from voice — review and save."}</div>}
@@ -1007,7 +1063,9 @@ function AddExpenseScreen({ onSave, onBack, trip, editExpense = null, prefill = 
         <InputRow label="Status"><SegmentedControl options={["paid", "pending", "partial", "refund"]} value={form.status} onChange={v => set("status", v)} colors={{ paid: T.green, pending: T.orange, partial: T.yellow, refund: T.purple }} /></InputRow>
       </div>
       <InputRow label="Payment"><select value={form.payment} onChange={e => set("payment", e.target.value)} style={inputStyle}>{PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}</select></InputRow>
-      <InputRow label="Date"><input type="date" value={form.date} min={minDate} max={todayStr} onChange={e => handleDateChange(e.target.value)} style={inputStyle} /><div style={{ color: T.textDim, fontSize: 11, marginTop: 6 }}>{form.date === todayStr ? "Today" : formatDate(form.date)} · backdate up to {BACKDATE_LIMIT_DAYS} days</div></InputRow>
+      <div ref={dateRef} style={focusDate ? { boxShadow: `0 0 0 2px ${T.accent}88`, borderRadius: 14, padding: "8px 8px 2px", marginBottom: 8 } : undefined }>
+        <InputRow label="Date"><input type="date" value={form.date} min={minDate} max={todayStr} onChange={e => handleDateChange(e.target.value)} style={inputStyle} /><div style={{ color: T.textDim, fontSize: 11, marginTop: 6 }}>{form.date === todayStr ? "Today" : formatDate(form.date)} · backdate up to {BACKDATE_LIMIT_DAYS} days</div></InputRow>
+      </div>
       <InputRow label="Notes"><textarea value={form.notes} onChange={e => set("notes", e.target.value)} placeholder="Details..." rows={2} style={{ ...inputStyle, resize: "none" }} /></InputRow>
       <div style={{ display: "flex", gap: 12, marginBottom: 12 }}><ToggleChip label="📋 Planned" active={form.planned} onToggle={() => set("planned", !form.planned)} activeColor={T.purple} /><ToggleChip label="🔄 Refundable" active={form.refundable} onToggle={() => set("refundable", !form.refundable)} activeColor={T.green} /></div>
       <div style={{ display: "flex", gap: 12, marginBottom: 16 }}><ToggleChip label="👥 Shared" active={form.shared} onToggle={() => set("shared", !form.shared)} activeColor={T.yellow} />{form.shared && <div style={{ flex: 1 }}><input value={form.sharedCount} onChange={e => set("sharedCount", e.target.value)} type="number" min="2" placeholder="#" style={{ ...inputStyle, textAlign: "center" }} /></div>}</div>
@@ -1445,14 +1503,19 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
   const [voiceState, setVoiceState] = useState("idle"); // 'idle' | 'pending' | 'listening' | 'parsing'
   const [voicePrefill, setVoicePrefill] = useState(null);
   const [voiceNote, setVoiceNote] = useState(null);
-  // "Add prior expense" from History → open the add form defaulted to a past date.
+  // Two-step "Add prior expense" flow (prior-date → prior-entry). `priorDate` is the picked
+  // backdate (null everywhere else → today); `addFocusDate` emphasizes the date on the manual form.
   const [priorDate, setPriorDate] = useState(null);
+  const [addFocusDate, setAddFocusDate] = useState(false);
   const [toast, setToast] = useState(null); // { title, amount, currency, voiceKey } | null
   const [micCard, setMicCard] = useState(null); // null | 'ask' | 'steps' — in-app mic permission card
   const [micBusy, setMicBusy] = useState(false); // Enable-Microphone request in flight
   const [micHint, setMicHint] = useState("");    // inline status/error under the Enable button
   const [micTries, setMicTries] = useState(0);   // bumps each blocked retry → re-flash the steps
   const openManualAdd = (note = null) => { setVoicePrefill(null); setVoiceNote(note); setPriorDate(null); setScreen("add"); };
+  // Keep the prior-expense date alive only within its flow; drop the focus flag off the add form.
+  useEffect(() => { if (!["prior-date", "prior-entry", "add"].includes(screen)) setPriorDate(null); }, [screen]);
+  useEffect(() => { if (screen !== "add") setAddFocusDate(false); }, [screen]);
   // ── Voice capture plumbing (MediaRecorder → Groq Whisper) ──
   const recorderRef = useRef(null);   // active MediaRecorder
   const streamRef = useRef(null);     // getUserMedia stream (tracks stopped on teardown)
@@ -1966,8 +2029,10 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
         {screen === "welcome" && <WelcomeScreen onStart={() => { setTrip(DEFAULT_TRIP); setExpenses(SEED_EXPENSES); setScreen("dashboard"); }} onCreateTrip={() => setScreen("create-trip")} onInstall={onInstall} isInstalled={isInstalled} canInstall={canInstall} isIOS={isIOS} isMobile={isMobile} isPro={isPro} onPaywall={onPaywall} user={user} />}
         {screen === "create-trip" && <CreateTripScreen onSave={t => { setTrip(t); setExpenses([]); setPendingPrefill(null); setScreen("dashboard"); }} onBack={() => { setPendingPrefill(null); setScreen(trip && trip.name ? "dashboard" : "welcome"); }} isPro={isPro} onPaywall={onPaywall} prefill={pendingPrefill} />}
         {screen === "dashboard" && <DashboardScreen expenses={expenses} trip={trip} setScreen={setScreen} setSelectedExpense={setSelectedExpense} />}
-        {screen === "history" && <HistoryScreen expenses={expenses} trip={trip} setScreen={setScreen} setSelectedExpense={setSelectedExpense} onEdit={handleEdit} onAddPrior={() => { setVoicePrefill(null); setVoiceNote(null); setPriorDate(addDays(localToday(), -1)); setScreen("add"); }} />}
-        {screen === "add" && <AddExpenseScreen onSave={addExpense} onBack={() => { setVoicePrefill(null); setVoiceNote(null); setPriorDate(null); setScreen("dashboard"); }} trip={trip} prefill={voicePrefill} note={voiceNote} defaultDate={priorDate} />}
+        {screen === "history" && <HistoryScreen expenses={expenses} trip={trip} setScreen={setScreen} setSelectedExpense={setSelectedExpense} onEdit={handleEdit} onAddPrior={() => { setVoicePrefill(null); setVoiceNote(null); setScreen("prior-date"); }} />}
+        {screen === "prior-date" && <PriorDateScreen onPick={(d) => { setPriorDate(d); setScreen("prior-entry"); }} onCancel={() => setScreen("history")} />}
+        {screen === "prior-entry" && priorDate && <PriorEntryScreen date={priorDate} voiceState={voiceState} onMic={() => { if (voiceState === "idle") startVoice(); else if (voiceState === "listening" || voiceState === "pending") stopVoice(); }} onManual={() => { setVoicePrefill(null); setVoiceNote(null); setAddFocusDate(true); setScreen("add"); }} onChangeDate={() => setScreen("prior-date")} onBack={() => setScreen("history")} />}
+        {screen === "add" && <AddExpenseScreen onSave={addExpense} onBack={() => { setVoicePrefill(null); setVoiceNote(null); setPriorDate(null); setScreen("dashboard"); }} trip={trip} prefill={voicePrefill} note={voiceNote} defaultDate={priorDate} focusDate={addFocusDate} />}
         {screen === "edit" && <AddExpenseScreen onSave={handleEditSave} onBack={() => setScreen("expense-detail")} trip={trip} editExpense={editExpense} />}
         {screen === "budget" && <BudgetScreen expenses={expenses} trip={trip} />}
         {screen === "reports" && <ReportsScreen expenses={expenses} trip={trip} setScreen={setScreen} />}
