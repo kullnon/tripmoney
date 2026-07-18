@@ -836,7 +836,8 @@ function DashboardScreen({ expenses, trip, setScreen, setSelectedExpense }) {
               <Card key={e.id} style={{ padding: "12px 14px", display: "flex", alignItems: "center", gap: 12 }} onClick={() => { setSelectedExpense(e); setScreen("expense-detail"); }}>
                 <div style={{ width: 40, height: 40, borderRadius: 12, background: cat.color + "22", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>{cat.icon}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ color: T.text, fontSize: 14, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.title}</div>
+                  <div style={{ color: T.text, fontSize: 14, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.title}{e.location ? <span style={{ color: T.textMid, fontWeight: 500 }}> · {e.location}</span> : null}</div>
+                  <div style={{ color: T.textMid, fontSize: 11, marginTop: 2 }}>{e.payment}</div>
                   <div style={{ display: "flex", gap: 6, marginTop: 3 }}><PhaseTag phase={e.phase} /><StatusBadge status={e.status} />{trip.isMultiLeg && <LegTag leg={e.legId} legs={trip.legs} />}</div>
                 </div>
                 <div style={{ color: T.text, fontSize: 16, fontWeight: 800, flexShrink: 0 }}>{fmtCur(e.amount, tc)}</div>
@@ -850,7 +851,7 @@ function DashboardScreen({ expenses, trip, setScreen, setSelectedExpense }) {
 }
 
 // ─── HISTORY ──────────────────────────────────────────────────────
-function HistoryScreen({ expenses, trip, setScreen, setSelectedExpense, onEdit }) {
+function HistoryScreen({ expenses, trip, setScreen, setSelectedExpense, onEdit, onAddPrior }) {
   const tc = trip.currency;
   const [search, setSearch] = useState(""); const [filterPhase, setFilterPhase] = useState("All"); const [filterStatus, setFilterStatus] = useState("All"); const [filterLeg, setFilterLeg] = useState("All"); const [sortBy, setSortBy] = useState("date");
   let filtered = expenses.filter(e => { const ms = !search || e.title.toLowerCase().includes(search.toLowerCase()); const mp = filterPhase === "All" || e.phase === filterPhase; const mst = filterStatus === "All" || e.status === filterStatus; const ml = filterLeg === "All" || e.legId === filterLeg; return ms && mp && mst && ml; });
@@ -858,8 +859,12 @@ function HistoryScreen({ expenses, trip, setScreen, setSelectedExpense, onEdit }
   const grouped = {}; filtered.forEach(e => { if (!grouped[e.date]) grouped[e.date] = []; grouped[e.date].push(e); }); const dates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
   return (
     <div style={{ padding: "20px 16px 100px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <div style={{ color: T.text, fontSize: 22, fontWeight: 900 }}>All Expenses</div><div style={{ color: T.textMid, fontSize: 13, fontWeight: 600 }}>{filtered.length}</div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
+          <div style={{ color: T.text, fontSize: 22, fontWeight: 900 }}>All Expenses</div>
+          <div style={{ color: T.textMid, fontSize: 13, fontWeight: 600 }}>{filtered.length}</div>
+        </div>
+        {onAddPrior && <button onClick={onAddPrior} title="Log an expense on a past date" style={{ flexShrink: 0, background: T.accent + "18", color: T.accent, border: `1px solid ${T.accent}55`, borderRadius: 10, padding: "8px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", lineHeight: 1 }}>📅 Add prior expense</button>}
       </div>
       <div style={{ position: "relative", marginBottom: 12 }}><span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: T.textDim }}>🔍</span><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..." style={{ ...inputStyle, paddingLeft: 42 }} /></div>
       <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 8 }}>
@@ -929,13 +934,15 @@ function ExpenseDetailScreen({ expense, trip, setScreen, onDelete, onDuplicate, 
 }
 
 // ─── ADD/EDIT EXPENSE ─────────────────────────────────────────────
-function AddExpenseScreen({ onSave, onBack, trip, editExpense = null, prefill = null, note = null }) {
+function AddExpenseScreen({ onSave, onBack, trip, editExpense = null, prefill = null, note = null, defaultDate = null }) {
   const isEdit = !!editExpense; const todayStr = localToday(); const tc = trip.currency;
+  // "Add prior expense" opens here with a past defaultDate; clamped to the backdating window.
+  const startDate = defaultDate ? (defaultDate > todayStr ? todayStr : defaultDate) : todayStr;
   // Voice pre-fill: seed amount/category/title from the parse; everything else uses the normal defaults.
   const preAmount = (!isEdit && prefill && prefill.amount != null) ? String(prefill.amount) : "";
   const lowConf = !isEdit && !!prefill && prefill.confidence === "low";
   const [form, setForm] = useState(editExpense ? { ...editExpense, amount: String(editExpense.amount), originalAmount: String(editExpense.originalAmount || editExpense.amount), exchangeRate: String(editExpense.exchangeRate || 1) } : {
-    title: prefill?.title || "", amount: preAmount, category: prefill?.category || "food", phase: autoPhase(todayStr, trip.departureDate, trip.returnDate), date: todayStr, payment: "💳 Credit Card", status: "paid", planned: false, notes: "", refundable: false, shared: false, sharedCount: 2, estimated: "", isDailySummary: false, originalAmount: preAmount, originalCurrency: tc, exchangeRate: "1", legId: autoLeg(todayStr, trip.legs), location: prefill?.location || "",
+    title: prefill?.title || "", amount: preAmount, category: prefill?.category || "food", phase: autoPhase(startDate, trip.departureDate, trip.returnDate), date: startDate, payment: "💳 Credit Card", status: "paid", planned: false, notes: "", refundable: false, shared: false, sharedCount: 2, estimated: "", isDailySummary: false, originalAmount: preAmount, originalCurrency: tc, exchangeRate: "1", legId: autoLeg(startDate, trip.legs), location: prefill?.location || "",
   });
   const flag = lowConf ? { boxShadow: `0 0 0 2px ${T.orange}88`, borderRadius: 14, padding: "8px 8px 2px", marginBottom: 8 } : undefined;
   const [saved, setSaved] = useState(false);
@@ -1130,11 +1137,6 @@ function ReportsScreen({ expenses, trip, setScreen }) {
   return (
     <div style={{ padding: "20px 16px 100px" }}>
       <div style={{ color: T.text, fontSize: 22, fontWeight: 900, marginBottom: 20 }}>Report</div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>{stats.map(({ l, v, c }) => <Card key={l} style={{ padding: 14 }}><div style={{ color: c, fontSize: 18, fontWeight: 900 }}>{v}</div><div style={{ color: T.textDim, fontSize: 11, fontWeight: 600, marginTop: 3 }}>{l}</div></Card>)}</div>
-      <Card style={{ marginBottom: 16 }}>
-        <div style={{ color: T.textMid, fontSize: 12, fontWeight: 700, textTransform: "uppercase", marginBottom: 14 }}>Daily Spending</div>
-        <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 90 }}>{dayEntries.map(([d, a]) => <div key={d} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}><div style={{ fontSize: 8, color: T.textDim, fontWeight: 700 }}>{curByCode(tc).symbol}{Math.round(a)}</div><div style={{ width: "100%", height: Math.max(4, (a / maxDay) * 70), background: T.accent, borderRadius: "3px 3px 1px 1px", opacity: 0.85 }} /><div style={{ fontSize: 8, color: T.textDim }}>{d.slice(5)}</div></div>)}</div>
-      </Card>
       {donut.slices.length > 0 && (
         <Card style={{ marginBottom: 16 }}>
           <div style={{ color: T.textMid, fontSize: 12, fontWeight: 700, textTransform: "uppercase", marginBottom: 10 }}>Spending Breakdown</div>
@@ -1144,6 +1146,11 @@ function ReportsScreen({ expenses, trip, setScreen }) {
           )}
         </Card>
       )}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>{stats.map(({ l, v, c }) => <Card key={l} style={{ padding: 14 }}><div style={{ color: c, fontSize: 18, fontWeight: 900 }}>{v}</div><div style={{ color: T.textDim, fontSize: 11, fontWeight: 600, marginTop: 3 }}>{l}</div></Card>)}</div>
+      <Card style={{ marginBottom: 16 }}>
+        <div style={{ color: T.textMid, fontSize: 12, fontWeight: 700, textTransform: "uppercase", marginBottom: 14 }}>Daily Spending</div>
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 90 }}>{dayEntries.map(([d, a]) => <div key={d} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}><div style={{ fontSize: 8, color: T.textDim, fontWeight: 700 }}>{curByCode(tc).symbol}{Math.round(a)}</div><div style={{ width: "100%", height: Math.max(4, (a / maxDay) * 70), background: T.accent, borderRadius: "3px 3px 1px 1px", opacity: 0.85 }} /><div style={{ fontSize: 8, color: T.textDim }}>{d.slice(5)}</div></div>)}</div>
+      </Card>
       <button onClick={() => setScreen("email-report")} style={{ width: "100%", background: T.accent, color: T.bg, border: "none", borderRadius: 14, padding: 15, fontSize: 16, fontWeight: 900, cursor: "pointer" }}>📤 Share Report</button>
     </div>
   );
@@ -1438,8 +1445,10 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
   const [voiceState, setVoiceState] = useState("idle"); // 'idle' | 'listening' | 'parsing'
   const [voicePrefill, setVoicePrefill] = useState(null);
   const [voiceNote, setVoiceNote] = useState(null);
+  // "Add prior expense" from History → open the add form defaulted to a past date.
+  const [priorDate, setPriorDate] = useState(null);
   const [toast, setToast] = useState(null); // { title, amount, currency, voiceKey } | null
-  const openManualAdd = (note = null) => { setVoicePrefill(null); setVoiceNote(note); setScreen("add"); };
+  const openManualAdd = (note = null) => { setVoicePrefill(null); setVoiceNote(note); setPriorDate(null); setScreen("add"); };
   const startVoice = () => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) { openManualAdd("Couldn't catch that — enter manually"); return; }
@@ -1488,6 +1497,7 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
           // FALLBACK — low confidence or bad amount: pre-fill the form for human review.
           setVoiceNote(null);
           setVoicePrefill({ amount: data.amount, category: data.category, title: data.title, confidence: data.confidence });
+          setPriorDate(null);
           setScreen("add");
         }
       } catch (err) {
@@ -1721,8 +1731,8 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
         {screen === "welcome" && <WelcomeScreen onStart={() => { setTrip(DEFAULT_TRIP); setExpenses(SEED_EXPENSES); setScreen("dashboard"); }} onCreateTrip={() => setScreen("create-trip")} onInstall={onInstall} isInstalled={isInstalled} canInstall={canInstall} isIOS={isIOS} isMobile={isMobile} isPro={isPro} onPaywall={onPaywall} user={user} />}
         {screen === "create-trip" && <CreateTripScreen onSave={t => { setTrip(t); setExpenses([]); setPendingPrefill(null); setScreen("dashboard"); }} onBack={() => { setPendingPrefill(null); setScreen(trip && trip.name ? "dashboard" : "welcome"); }} isPro={isPro} onPaywall={onPaywall} prefill={pendingPrefill} />}
         {screen === "dashboard" && <DashboardScreen expenses={expenses} trip={trip} setScreen={setScreen} setSelectedExpense={setSelectedExpense} />}
-        {screen === "history" && <HistoryScreen expenses={expenses} trip={trip} setScreen={setScreen} setSelectedExpense={setSelectedExpense} onEdit={handleEdit} />}
-        {screen === "add" && <AddExpenseScreen onSave={addExpense} onBack={() => { setVoicePrefill(null); setVoiceNote(null); setScreen("dashboard"); }} trip={trip} prefill={voicePrefill} note={voiceNote} />}
+        {screen === "history" && <HistoryScreen expenses={expenses} trip={trip} setScreen={setScreen} setSelectedExpense={setSelectedExpense} onEdit={handleEdit} onAddPrior={() => { setVoicePrefill(null); setVoiceNote(null); setPriorDate(addDays(localToday(), -1)); setScreen("add"); }} />}
+        {screen === "add" && <AddExpenseScreen onSave={addExpense} onBack={() => { setVoicePrefill(null); setVoiceNote(null); setPriorDate(null); setScreen("dashboard"); }} trip={trip} prefill={voicePrefill} note={voiceNote} defaultDate={priorDate} />}
         {screen === "edit" && <AddExpenseScreen onSave={handleEditSave} onBack={() => setScreen("expense-detail")} trip={trip} editExpense={editExpense} />}
         {screen === "budget" && <BudgetScreen expenses={expenses} trip={trip} />}
         {screen === "reports" && <ReportsScreen expenses={expenses} trip={trip} setScreen={setScreen} />}
@@ -1731,7 +1741,7 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
         {screen === "settings" && <SettingsScreen trip={trip} onUpdateTrip={setTrip} onClearData={() => { setExpenses([]); setScreen("dashboard"); }} onDeleteTrip={async () => { try { if (tripDbId) await dbDeleteTrip(tripDbId); } catch (err) { console.error("deleteTrip failed:", err); alert("Could not delete trip. Try again."); return; } setExpenses([]); setTrip(null); setTripDbId(null); setScreen("welcome"); screenHistory.current = ["welcome"]; }} onNewTrip={() => setScreen("create-trip")} onBack={() => setScreen("dashboard")} user={user} profile={profile} isPro={isPro} onSignOut={onSignOut} onInstall={onInstall} isInstalled={isInstalled} onPaywall={onPaywall} />}
         {screen === "email-report" && <EmailReportScreen trip={trip} expenses={expenses} onBack={() => setScreen("reports")} />}
       </div>
-      {showQuickAdd && <QuickAddSheet onSave={addExpense} onFullForm={() => { setVoicePrefill(null); setVoiceNote(null); setShowQuickAdd(false); setScreen("add"); }} onClose={() => setShowQuickAdd(false)} trip={trip} />}
+      {showQuickAdd && <QuickAddSheet onSave={addExpense} onFullForm={() => { setVoicePrefill(null); setVoiceNote(null); setPriorDate(null); setShowQuickAdd(false); setScreen("add"); }} onClose={() => setShowQuickAdd(false)} trip={trip} />}
       {toast && (
         <div style={{ position: "fixed", bottom: 90, left: "50%", transform: "translateX(-50%)", width: "calc(100% - 32px)", maxWidth: 358, zIndex: 300, background: T.surface, border: `1px solid ${T.green}66`, borderRadius: 14, padding: "12px 14px", display: "flex", alignItems: "center", gap: 10, boxShadow: "0 10px 40px rgba(0,0,0,0.5)" }}>
           <div style={{ flex: 1, color: T.text, fontSize: 14, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Added {toast.title} {curByCode(toast.currency).symbol}{toast.amount} ✓</div>

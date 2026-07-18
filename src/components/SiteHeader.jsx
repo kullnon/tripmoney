@@ -34,30 +34,30 @@ export default function SiteHeader({ scrollY = 0, onGetStarted }) {
         padding: "16px 0",
       }}
     >
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 24px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 32 }}>
         {/* Brand: logo pinned LEFT of the wordmark, never shrinks, gap for breathing room */}
         <a
           href="/"
-          style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0, textDecoration: "none" }}
+          style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, textDecoration: "none" }}
           aria-label="MyTripMoney home"
         >
           {logoOk ? (
             <img
               src="/favicon.png"
               alt="MyTripMoney logo"
-              width={32}
-              height={32}
-              style={{ width: 32, height: 32, borderRadius: 8, flexShrink: 0, display: "block" }}
+              width={26}
+              height={26}
+              style={{ width: 26, height: 26, borderRadius: 7, flexShrink: 0, display: "block" }}
               onError={() => setLogoOk(false)}
             />
           ) : (
             <span
               aria-hidden="true"
               style={{
-                width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                width: 26, height: 26, borderRadius: 7, flexShrink: 0,
                 display: "flex", alignItems: "center", justifyContent: "center",
                 background: T.accent, color: T.bg, fontFamily: "Sora, sans-serif",
-                fontWeight: 800, fontSize: 18, lineHeight: 1,
+                fontWeight: 800, fontSize: 15, lineHeight: 1,
               }}
             >
               M
@@ -69,7 +69,7 @@ export default function SiteHeader({ scrollY = 0, onGetStarted }) {
           </span>
         </a>
 
-        <div className="nav-links" style={{ display: "flex", alignItems: "center" }}>
+        <div className="nav-links" style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
           <a href="/guides" className="nav-pricing" style={{ color: T.textMid, textDecoration: "none", fontSize: 14, fontWeight: 600 }}>Guides</a>
           <a href="#pricing" className="nav-pricing" style={{ color: T.textMid, textDecoration: "none", fontSize: 14, fontWeight: 600 }}>Pricing</a>
           <a href="https://blog.mytripmoney.com" className="nav-pricing" style={{ color: T.textMid, textDecoration: "none", fontSize: 14, fontWeight: 600 }}>Blog</a>
