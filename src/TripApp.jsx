@@ -942,7 +942,7 @@ function AddExpenseScreen({ onSave, onBack, trip, editExpense = null, prefill = 
   const preAmount = (!isEdit && prefill && prefill.amount != null) ? String(prefill.amount) : "";
   const lowConf = !isEdit && !!prefill && prefill.confidence === "low";
   const [form, setForm] = useState(editExpense ? { ...editExpense, amount: String(editExpense.amount), originalAmount: String(editExpense.originalAmount || editExpense.amount), exchangeRate: String(editExpense.exchangeRate || 1) } : {
-    title: prefill?.title || "", amount: preAmount, category: prefill?.category || "food", phase: autoPhase(startDate, trip.departureDate, trip.returnDate), date: startDate, payment: "💳 Credit Card", status: "paid", planned: false, notes: "", refundable: false, shared: false, sharedCount: 2, estimated: "", isDailySummary: false, originalAmount: preAmount, originalCurrency: tc, exchangeRate: "1", legId: autoLeg(startDate, trip.legs), location: prefill?.location || "",
+    title: prefill?.title || "", amount: preAmount, category: prefill?.category || "food", phase: autoPhase(startDate, trip.departureDate, trip.returnDate), date: startDate, payment: (prefill?.payment && PAYMENT_METHODS.includes(prefill.payment)) ? prefill.payment : "💳 Credit Card", status: "paid", planned: false, notes: "", refundable: false, shared: false, sharedCount: 2, estimated: "", isDailySummary: false, originalAmount: preAmount, originalCurrency: tc, exchangeRate: "1", legId: autoLeg(startDate, trip.legs), location: prefill?.location || "",
   });
   const flag = lowConf ? { boxShadow: `0 0 0 2px ${T.orange}88`, borderRadius: 14, padding: "8px 8px 2px", marginBottom: 8 } : undefined;
   const [saved, setSaved] = useState(false);
@@ -1437,79 +1437,314 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
   const [tripDbId, setTripDbId] = useState(null);
   const [syncing, setSyncing] = useState(false);
 
-  // VOICE-TO-EXPENSE: mic → Web Speech API → /api/parse-expense.
-  // Happy path (confidence "high" + valid amount): auto-save straight through addExpense
-  // (optimistic local + user/tripDbId persistence guard), land on the dashboard, and offer a
-  // one-tap Undo toast. Uncertain parses (low confidence / bad amount) fall back to the
-  // pre-filled form for human review — that is the only path that opens the "add" screen.
-  const [voiceState, setVoiceState] = useState("idle"); // 'idle' | 'listening' | 'parsing'
+  // VOICE-TO-EXPENSE (Groq Whisper): tap mic → MediaRecorder capture → /api/transcribe
+  // (Groq whisper-large-v3-turbo, key stays server-side) → /api/parse-expense → save to
+  // History. High confidence + valid amount auto-saves; uncertain parses fall back to the
+  // pre-filled form. A 5s minimum listen window + never-stop-before-speech fix the
+  // "mic too fast" cutoff (silence only finalizes after ≥5s AND ≥3s of quiet post-speech).
+  const [voiceState, setVoiceState] = useState("idle"); // 'idle' | 'pending' | 'listening' | 'parsing'
   const [voicePrefill, setVoicePrefill] = useState(null);
   const [voiceNote, setVoiceNote] = useState(null);
   // "Add prior expense" from History → open the add form defaulted to a past date.
   const [priorDate, setPriorDate] = useState(null);
   const [toast, setToast] = useState(null); // { title, amount, currency, voiceKey } | null
+  const [micCard, setMicCard] = useState(null); // null | 'ask' | 'steps' — in-app mic permission card
+  const [micBusy, setMicBusy] = useState(false); // Enable-Microphone request in flight
+  const [micHint, setMicHint] = useState("");    // inline status/error under the Enable button
+  const [micTries, setMicTries] = useState(0);   // bumps each blocked retry → re-flash the steps
   const openManualAdd = (note = null) => { setVoicePrefill(null); setVoiceNote(note); setPriorDate(null); setScreen("add"); };
-  const startVoice = () => {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) { openManualAdd("Couldn't catch that — enter manually"); return; }
-    let rec;
-    try { rec = new SR(); } catch { openManualAdd("Couldn't catch that — enter manually"); return; }
-    rec.lang = trip?.locale || "en-US";
-    rec.interimResults = false;
-    rec.maxAlternatives = 1;
-    rec.continuous = false;
-    let handled = false;
-    setVoiceNote(null);
-    setVoiceState("listening");
-    rec.onresult = async (event) => {
-      handled = true;
-      const transcript = (event.results?.[0]?.[0]?.transcript || "").trim();
-      if (!transcript) { setVoiceState("idle"); openManualAdd("Couldn't catch that — enter manually"); return; }
-      setVoiceState("parsing");
-      try {
-        const resp = await fetch("/api/parse-expense", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ transcript, currency: trip.currency }) });
-        const data = await resp.json();
-        if (!resp.ok || data.error || data.amount == null) { setVoiceState("idle"); openManualAdd("Couldn't catch that — enter manually"); return; }
-        setVoiceState("idle");
-        const amt = Number(data.amount);
-        const highConf = data.confidence === "high" && Number.isFinite(amt) && amt > 0;
-        if (highConf) {
-          // HAPPY PATH — build the expense with the same defaults Quick-Add/the form use,
-          // save it directly (no form), land on the dashboard, and show an Undo toast.
-          const todayStr = localToday();
-          const voiceKey = uid();
-          const expense = {
-            id: uid(), _voiceKey: voiceKey,
-            title: data.title || catById(data.category).label,
-            amount: amt, category: data.category,
-            phase: autoPhase(todayStr, trip.departureDate, trip.returnDate),
-            date: todayStr, payment: "💳 Credit Card", status: "paid", planned: false,
-            notes: "", refundable: false, shared: false, sharedCount: 1, estimated: 0,
-            isDailySummary: false, originalAmount: amt, originalCurrency: trip.currency,
-            exchangeRate: 1, legId: autoLeg(todayStr, trip.legs),
-          };
-          setVoiceNote(null);
-          setVoicePrefill(null);
-          addExpense(expense);
-          setScreen("dashboard");
-          setToast({ title: expense.title, amount: amt, currency: trip.currency, voiceKey });
-        } else {
-          // FALLBACK — low confidence or bad amount: pre-fill the form for human review.
-          setVoiceNote(null);
-          setVoicePrefill({ amount: data.amount, category: data.category, title: data.title, confidence: data.confidence });
-          setPriorDate(null);
-          setScreen("add");
-        }
-      } catch (err) {
-        console.error("parse-expense request failed:", err);
-        setVoiceState("idle");
-        openManualAdd("Couldn't catch that — enter manually");
-      }
-    };
-    rec.onerror = () => { if (handled) return; handled = true; setVoiceState("idle"); openManualAdd("Couldn't catch that — enter manually"); };
-    rec.onend = () => { if (handled) return; handled = true; setVoiceState("idle"); openManualAdd("Couldn't catch that — enter manually"); };
-    try { rec.start(); } catch { setVoiceState("idle"); openManualAdd("Couldn't catch that — enter manually"); }
+  // ── Voice capture plumbing (MediaRecorder → Groq Whisper) ──
+  const recorderRef = useRef(null);   // active MediaRecorder
+  const streamRef = useRef(null);     // getUserMedia stream (tracks stopped on teardown)
+  const audioCtxRef = useRef(null);   // AudioContext backing the silence AnalyserNode
+  const rafRef = useRef(null);        // requestAnimationFrame id for the RMS loop
+  const chunksRef = useRef([]);       // recorded blob chunks
+  const mimeRef = useRef("");         // chosen recording mime type
+  const finalizeRef = useRef(null);   // lets the Stop button / tap-again end the session
+
+  // Short app-controlled cue tones (throwaway AudioContext each time) — the only sounds.
+  const cueTone = (freq, ms) => {
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      const ctx = new AC();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      const t0 = ctx.currentTime;
+      gain.gain.setValueAtTime(0.0001, t0);
+      gain.gain.exponentialRampToValueAtTime(0.14, t0 + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + ms / 1000);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(t0); osc.stop(t0 + ms / 1000 + 0.02);
+      osc.onended = () => { try { ctx.close(); } catch (_) { /* ignore */ } };
+    } catch (_) { /* cue is best-effort */ }
   };
+  const startCue = () => cueTone(880, 120);
+  const endCue = () => cueTone(520, 160);
+
+  // First MediaRecorder mime the browser supports (Chrome/Android → webm/opus, Safari → mp4).
+  const pickMime = () => {
+    if (typeof window.MediaRecorder === "undefined") return "";
+    const cands = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus", "audio/ogg"];
+    for (const m of cands) { try { if (MediaRecorder.isTypeSupported(m)) return m; } catch (_) { /* ignore */ } }
+    return "";
+  };
+
+  // Stop the RMS loop, close the AudioContext, and release the mic tracks.
+  const teardownAudio = () => {
+    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+    const ctx = audioCtxRef.current; audioCtxRef.current = null;
+    if (ctx) { try { ctx.close(); } catch (_) { /* ignore */ } }
+    const st = streamRef.current; streamRef.current = null;
+    if (st) { try { st.getTracks().forEach(t => t.stop()); } catch (_) { /* ignore */ } }
+  };
+
+  // Tear everything down on unmount so no recorder / mic / audio graph is left running.
+  useEffect(() => () => {
+    finalizeRef.current = null;
+    const r = recorderRef.current; recorderRef.current = null;
+    if (r && r.state !== "inactive") { try { r.onstop = null; r.ondataavailable = null; r.stop(); } catch (_) { /* ignore */ } }
+    teardownAudio();
+  }, []);
+
+  const MIC_NO_START = "🎤 Microphone didn't start — check mic permission, or enter manually.";
+  const MIC_NO_SPEECH = "🎤 Didn't catch any speech — try again or enter manually.";
+  const MIC_SERVICE = "🎤 Voice service unavailable — enter manually.";
+  const MIC_NO_AMOUNT = "🎤 Couldn't read the amount — enter manually.";
+  const MIC_GENERIC = "🎤 Couldn't catch that — enter manually.";
+
+  // Send the captured phrase to the parser, then save (high conf) or hand to the form.
+  const submitTranscript = async (transcript) => {
+    setVoiceState("parsing");
+    const ctrl = new AbortController();
+    const to = setTimeout(() => ctrl.abort(), 15000);
+    try {
+      const resp = await fetch("/api/parse-expense", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ transcript, currency: trip.currency }), signal: ctrl.signal });
+      const data = await resp.json();
+      if (!resp.ok || data.error || data.amount == null) {
+        // Speech WAS captured — the parser just couldn't pull a valid amount. Keep the
+        // spoken text pre-filled so the user only has to fix the number.
+        setVoiceState("idle");
+        setVoiceNote(MIC_NO_AMOUNT);
+        setVoicePrefill({ amount: null, category: data?.category, title: data?.title || transcript, location: data?.location || null, confidence: "low" });
+        setPriorDate(null);
+        setScreen("add");
+        return;
+      }
+      setVoiceState("idle");
+      const amt = Number(data.amount);
+      const highConf = data.confidence === "high" && Number.isFinite(amt) && amt > 0;
+      if (!highConf) {
+        // Amount present but LOW confidence → pre-fill the review form so the user can confirm.
+        setVoiceNote(null);
+        setVoicePrefill({ amount: data.amount, category: data.category, title: data.title, payment: data.payment || null, location: data.location || null, confidence: data.confidence });
+        setPriorDate(null);
+        setScreen("add");
+        return;
+      }
+      // HIGH confidence + valid amount → build with MTM's schema, SAVE, and land on History.
+      const todayStr = priorDate || localToday();
+      const payment = (data.payment && PAYMENT_METHODS.includes(data.payment)) ? data.payment : "💳 Credit Card";
+      const voiceKey = uid();
+      const expense = {
+        id: uid(), _voiceKey: voiceKey,
+        title: data.title || catById(data.category).label,
+        amount: amt, category: data.category,
+        phase: autoPhase(todayStr, trip.departureDate, trip.returnDate),
+        date: todayStr, payment, status: "paid", planned: false,
+        notes: "", refundable: false, shared: false, sharedCount: 1, estimated: 0,
+        isDailySummary: false, originalAmount: amt, originalCurrency: trip.currency,
+        exchangeRate: 1, legId: autoLeg(todayStr, trip.legs), location: data.location || null,
+      };
+      setVoiceNote(null);
+      setVoicePrefill(null);
+      addExpense(expense);
+      setScreen("history");
+      setToast({ title: expense.title, amount: amt, currency: trip.currency, voiceKey });
+    } catch (err) {
+      console.error("parse-expense request failed:", err);
+      setVoiceState("idle");
+      setVoiceNote(MIC_NO_AMOUNT);
+      setVoicePrefill({ amount: null, title: transcript, confidence: "low" });
+      setPriorDate(null);
+      setScreen("add");
+    } finally {
+      clearTimeout(to);
+    }
+  };
+
+  // Stop an in-flight recording (tap-Stop or auto-silence). The real post-processing
+  // happens in recorder.onstop (onRecordingStop).
+  const stopRecording = () => {
+    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+    finalizeRef.current = null;
+    const r = recorderRef.current;
+    if (!r || r.state === "inactive") return;
+    try { r.stop(); } catch (_) { /* onstop may already be firing */ }
+  };
+
+  // Silence detection with WadWall's timing: NEVER finalize before the 5s minimum listen
+  // window or before the user has actually spoken (cold-start grace); after speech, stop on
+  // ~3s of continuous quiet; hard 15s cap. This is the fix for the "mic too fast" cutoff.
+  const startSilenceLoop = (analyser) => {
+    const data = new Uint8Array(analyser.fftSize);
+    const THRESH = 0.02;          // RMS above this = speech
+    const SILENCE_MS = 3000;      // stop this long after the last words
+    const MIN_LISTEN_MS = 5000;   // guarantee ≥5s of active listening on every (cold) start
+    const MAX_LISTEN_MS = 15000;  // hard cap — never record longer than this
+    let spoke = false;
+    const startedAt = performance.now();
+    let lastLoud = startedAt;
+    const tick = () => {
+      const r = recorderRef.current;
+      if (!r || r.state !== "recording") return;   // stopped elsewhere
+      analyser.getByteTimeDomainData(data);
+      let sum = 0;
+      for (let i = 0; i < data.length; i++) { const v = (data[i] - 128) / 128; sum += v * v; }
+      const rms = Math.sqrt(sum / data.length);
+      const now = performance.now();
+      if (rms > THRESH) { spoke = true; lastLoud = now; }
+      const elapsed = now - startedAt;
+      if (elapsed >= MAX_LISTEN_MS) { stopRecording(); return; }
+      if (spoke && now - lastLoud >= SILENCE_MS && elapsed >= MIN_LISTEN_MS) { stopRecording(); return; }
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+  };
+
+  // Upload the recorded audio to /api/transcribe (Groq Whisper) and return its text.
+  const transcribeBlob = async (blob, mime) => {
+    const ctrl = new AbortController();
+    const to = setTimeout(() => ctrl.abort(), 30000);
+    try {
+      const ext = mime.includes("mp4") ? "m4a" : mime.includes("ogg") ? "ogg" : "webm";
+      const fd = new FormData();
+      fd.append("file", blob, `audio.${ext}`);
+      const resp = await fetch("/api/transcribe", { method: "POST", body: fd, signal: ctrl.signal });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || data.error) throw new Error(data.error || `transcribe ${resp.status}`);
+      return (data.transcript || "").toString().trim();
+    } finally {
+      clearTimeout(to);
+    }
+  };
+
+  // After the recorder stops: end-cue, "Processing…", build the blob, transcribe, parse.
+  const onRecordingStop = async () => {
+    endCue();
+    teardownAudio();
+    const chunks = chunksRef.current; chunksRef.current = [];
+    const mime = mimeRef.current || "audio/webm";
+    const total = chunks.reduce((acc, c) => acc + (c.size || 0), 0);
+    if (!chunks.length || total === 0) { setVoiceState("idle"); openManualAdd(MIC_NO_SPEECH); return; }
+    setVoiceState("parsing");
+    const blob = new Blob(chunks, { type: mime });
+    try {
+      const transcript = await transcribeBlob(blob, mime);
+      if (!transcript) { setVoiceState("idle"); openManualAdd(MIC_NO_SPEECH); return; }
+      await submitTranscript(transcript);
+    } catch (err) {
+      console.error("transcribe failed:", err);
+      setVoiceState("idle");
+      openManualAdd(MIC_SERVICE);
+    }
+  };
+
+  // Start MediaRecorder on an already-acquired mic stream + wire silence detection.
+  const beginRecording = (stream) => {
+    streamRef.current = stream;
+    chunksRef.current = [];
+    const mime = pickMime();
+    mimeRef.current = mime || "audio/webm";
+    let recorder;
+    try { recorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream); }
+    catch (_) { try { recorder = new MediaRecorder(stream); } catch (_2) { teardownAudio(); setVoiceState("idle"); openManualAdd(MIC_GENERIC); return; } }
+    recorderRef.current = recorder;
+    recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunksRef.current.push(e.data); };
+    recorder.onstop = onRecordingStop;
+    recorder.onerror = () => { teardownAudio(); recorderRef.current = null; setVoiceState("idle"); openManualAdd(MIC_NO_START); };
+
+    // Silence-detection graph. AnalyserNode is read-only (never connected to output → no feedback).
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) {
+        const ctx = new AC();
+        audioCtxRef.current = ctx;
+        try { ctx.resume(); } catch (_) { /* iOS: resume so RMS reads real audio */ }
+        const src = ctx.createMediaStreamSource(stream);
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 2048;
+        src.connect(analyser);
+        startSilenceLoop(analyser);
+      }
+    } catch (_) { /* no auto-silence; the Stop tap still ends it */ }
+
+    finalizeRef.current = () => stopRecording();
+    try { recorder.start(); } catch (_) { teardownAudio(); recorderRef.current = null; setVoiceState("idle"); openManualAdd(MIC_NO_START); return; }
+    setVoiceState("listening");
+  };
+
+  // Play the start cue, acquire the mic, and begin recording. A blocked user gets the in-app
+  // permission card; an unsupported browser → manual form.
+  const startVoice = async () => {
+    if (!navigator.mediaDevices?.getUserMedia || typeof window.MediaRecorder === "undefined") {
+      openManualAdd(MIC_GENERIC); return;
+    }
+    setVoiceNote(null);
+    setVoiceState("pending");
+    startCue();
+
+    let cancelled = false;
+    finalizeRef.current = () => { cancelled = true; };
+
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err) {
+      finalizeRef.current = null;
+      setVoiceState("idle");
+      if (err?.name === "NotAllowedError" || err?.name === "SecurityError") { setMicHint(""); setMicBusy(false); setMicTries(0); setMicCard("ask"); }
+      else openManualAdd(MIC_NO_START);
+      return;
+    }
+    if (cancelled) { try { stream.getTracks().forEach(t => t.stop()); } catch (_) { /* ignore */ } setVoiceState("idle"); return; }
+    beginRecording(stream);
+  };
+
+  // Permission-card primary action: re-request the mic. Granted → record; still blocked →
+  // reveal the inline "how to re-enable" steps in the same card.
+  const retryMicPermission = async () => {
+    if (micBusy) return;
+    setMicHint("");
+    setMicBusy(true);
+    if (!navigator.mediaDevices?.getUserMedia || typeof window.MediaRecorder === "undefined") { setMicBusy(false); setMicCard(null); openManualAdd(null); return; }
+    try {
+      const stream = await Promise.race([
+        navigator.mediaDevices.getUserMedia({ audio: true }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("gum-timeout")), 8000)),
+      ]);
+      setMicBusy(false);
+      setMicCard(null);
+      setVoiceNote(null);
+      setVoiceState("pending");
+      startCue();
+      beginRecording(stream);
+    } catch (err) {
+      setMicBusy(false);
+      setMicCard("steps");
+      setMicTries(n => n + 1);
+      setMicHint(
+        (err?.name === "NotAllowedError" || err?.name === "SecurityError" || err?.message === "gum-timeout")
+          ? "Still blocked — follow the steps above, then tap Enable again."
+          : "Couldn't start the mic — follow the steps above, then tap Enable again."
+      );
+    }
+  };
+
+  // Tap-again / external stop for an in-flight recording session.
+  const stopVoice = () => { if (finalizeRef.current) finalizeRef.current(); };
   // Pre-trip estimator handoff: estimator stores `pendingTrip` in localStorage,
   // we hydrate the new-trip form once when the user lands authenticated.
   const [pendingPrefill, setPendingPrefill] = useState(null);
@@ -1710,7 +1945,7 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
     if (!d) return;
     if (d.moved) { fabMovedRef.current = true; setFabPos({ x: d.lastX, y: d.lastY }); return; }
     // A tap → run the pressed button's action.
-    if (d.fab === "mic") { if (voiceState === "idle") startVoice(); }        // busy states no-op
+    if (d.fab === "mic") { if (voiceState === "idle") startVoice(); else if (voiceState === "listening" || voiceState === "pending") stopVoice(); } // parsing → no-op
     else if (d.fab === "add") { setShowQuickAdd(true); }                      // manual text quick-add
   };
 
@@ -1749,6 +1984,38 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
           <button onClick={() => setToast(null)} aria-label="Dismiss" style={{ background: "none", border: "none", color: T.textDim, fontSize: 20, cursor: "pointer", flexShrink: 0, lineHeight: 1, padding: 0 }}>×</button>
         </div>
       )}
+      {micCard && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 400, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+          <div style={{ position: "absolute", inset: 0, background: "rgba(10,15,30,0.55)", backdropFilter: "blur(4px)" }} onClick={() => { setMicCard(null); setMicBusy(false); setMicHint(""); }} />
+          <div style={{ position: "relative", width: "calc(100% - 24px)", maxWidth: 380, margin: "0 auto 16px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 20, padding: "22px 20px", boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
+            <style>{`@keyframes micspin { to { transform: rotate(360deg); } } @keyframes micstepflash { 0% { box-shadow: 0 0 0 0 ${T.accent}00; } 30% { box-shadow: 0 0 0 3px ${T.accent}88; } 100% { box-shadow: 0 0 0 0 ${T.accent}00; } }`}</style>
+            <div style={{ fontSize: 34, marginBottom: 10 }}>🎤</div>
+            <div style={{ color: T.text, fontSize: 19, fontWeight: 900, letterSpacing: -0.3, marginBottom: 6 }}>Enable microphone to log by voice</div>
+            <div style={{ color: T.textMid, fontSize: 14, lineHeight: 1.45, marginBottom: 18 }}>
+              {micCard === "ask"
+                ? "Tap “Enable Microphone” and choose Allow — then just say your expense out loud."
+                : "The mic is still blocked. Turn it back on in a couple of taps — no need to leave MyTripMoney:"}
+            </div>
+            {micCard === "steps" && (
+              <div key={micTries} style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 18, borderRadius: 14, animation: micTries ? "micstepflash 0.9s ease-out" : "none" }}>
+                {[["🔒", "Tap the lock icon at the top, next to the web address"], ["⚙️", "Open Permissions (or “Site settings”)"], ["🎤", "Switch Microphone to Allow"], ["↩️", "Come back and tap “Enable Microphone” below"]].map(([icon, text], i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, background: T.card, border: `1px solid ${T.border}`, borderRadius: 12, padding: "10px 12px" }}>
+                    <span style={{ flexShrink: 0, width: 22, height: 22, borderRadius: 999, background: T.accent + "22", color: T.accent, fontSize: 12, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center" }}>{i + 1}</span>
+                    <span style={{ fontSize: 17, flexShrink: 0 }}>{icon}</span>
+                    <span style={{ color: T.text, fontSize: 13.5, fontWeight: 600, lineHeight: 1.3 }}>{text}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {micHint && <div style={{ color: T.accent, fontSize: 13, fontWeight: 700, marginBottom: 10, lineHeight: 1.35 }}>{micHint}</div>}
+            <button onClick={retryMicPermission} disabled={micBusy} style={{ width: "100%", background: T.accent, color: "#FFFFFF", border: "none", borderRadius: 14, padding: 15, fontSize: 16, fontWeight: 800, cursor: micBusy ? "default" : "pointer", opacity: micBusy ? 0.75 : 1, marginBottom: 10, boxShadow: `0 8px 22px ${T.accent}44`, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              {micBusy && <span style={{ width: 15, height: 15, border: "2px solid #FFFFFF", borderTopColor: "transparent", borderRadius: "50%", display: "inline-block", animation: "micspin 0.7s linear infinite" }} />}
+              {micBusy ? "Requesting…" : "Enable Microphone"}
+            </button>
+            <button onClick={() => { setMicCard(null); setMicBusy(false); setMicHint(""); openManualAdd(null); }} disabled={micBusy} style={{ width: "100%", background: "none", color: T.textMid, border: "none", borderRadius: 14, padding: 10, fontSize: 14, fontWeight: 700, cursor: micBusy ? "default" : "pointer", opacity: micBusy ? 0.6 : 1 }}>Maybe later — enter manually</button>
+          </div>
+        </div>
+      )}
       {isNav && !showQuickAdd && (
         <div
           ref={fabRef}
@@ -1759,7 +2026,7 @@ export default function TripMoneyApp({ user, profile, isPro, onSignOut, onInstal
           style={{ position: "fixed", left: fabPos.x, top: fabPos.y, display: "flex", flexDirection: "column", gap: FAB_GAP, zIndex: 100, alignItems: "center", touchAction: "none" }}
         >
           <style>{`@keyframes vpulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.08); opacity: 0.7; } }`}</style>
-          <button data-fab="mic" title={voiceState === "listening" ? "Listening…" : "Add by voice (drag to move)"} style={{ width: FAB_SIZE, height: FAB_SIZE, borderRadius: "50%", background: voiceState === "listening" ? T.red : T.surface, border: `2px solid ${voiceState === "listening" ? T.red : T.accent}`, cursor: "pointer", touchAction: "none", padding: 0, fontSize: 24, display: "flex", alignItems: "center", justifyContent: "center", color: voiceState === "listening" ? "#fff" : T.text, boxShadow: voiceState === "listening" ? `0 8px 30px ${T.red}66` : `0 4px 20px ${T.accent}33`, animation: voiceState === "listening" ? "vpulse 1s ease-in-out infinite" : "none" }}>{voiceState === "parsing" ? "⏳" : <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" y1="19" x2="12" y2="22" /></svg>}</button>
+          <button data-fab="mic" title={voiceState === "listening" || voiceState === "pending" ? "Tap to stop" : "Add by voice (drag to move)"} style={{ width: FAB_SIZE, height: FAB_SIZE, borderRadius: "50%", background: voiceState === "listening" ? T.red : T.surface, border: `2px solid ${voiceState === "listening" ? T.red : T.accent}`, cursor: "pointer", touchAction: "none", padding: 0, fontSize: 24, display: "flex", alignItems: "center", justifyContent: "center", color: voiceState === "listening" ? "#fff" : T.text, boxShadow: voiceState === "listening" ? `0 8px 30px ${T.red}66` : `0 4px 20px ${T.accent}33`, animation: (voiceState === "listening" || voiceState === "pending") ? "vpulse 1s ease-in-out infinite" : "none" }}>{voiceState === "parsing" ? "⏳" : <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" y1="19" x2="12" y2="22" /></svg>}</button>
           <button data-fab="add" title="Add expense (drag to move)" style={{ width: FAB_SIZE, height: FAB_SIZE, borderRadius: "50%", background: T.accent, border: "none", cursor: "pointer", touchAction: "none", padding: 0, fontSize: 28, fontWeight: 900, color: T.bg, boxShadow: `0 8px 30px ${T.accent}66`, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
         </div>
       )}
