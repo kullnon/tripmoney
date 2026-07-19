@@ -6,6 +6,7 @@ import { PaywallScreen } from './PaywallScreen.jsx';
 import LandingPage from './LandingPage.jsx';
 import TripApp from './TripApp.jsx';
 import { useInstallPrompt, InstallModal } from './InstallPrompt.jsx';
+import UpdateBanner from './UpdateBanner.jsx';
 import AdminApp from './admin/AdminApp.jsx';
 import CheckoutScreen from './CheckoutScreen.jsx';
 
@@ -42,6 +43,7 @@ function LoadingScreen() {
 export default function App() {
   const { user, profile, loading, isPro, signOut } = useAuth();
   const [view, setView] = useState(() => PATH_TO_VIEW[window.location.pathname] || 'landing');
+  const [authMode, setAuthMode] = useState("login"); // which tab AuthScreen opens on (login | signup)
   const [paywallFeature, setPaywallFeature] = useState("");
   const [minLoadDone, setMinLoadDone] = useState(false);
 
@@ -190,7 +192,8 @@ export default function App() {
     if (view === "landing" && !user) {
       return <LandingPage
         onGetStarted={handleStartFree}
-        onLogin={() => setView("auth")}
+        onLogin={() => { setAuthMode("login"); setView("auth"); }}
+        onRegister={() => { setAuthMode("signup"); setView("auth"); }}
         onGoPro={handleGoPro}
         onInstall={() => setShowInstallModal(true)}
         canInstall={canInstall}
@@ -200,7 +203,7 @@ export default function App() {
         triggerInstall={triggerInstall}
       />;
     }
-    if (view === "auth" && !user) return <AuthScreen onBack={() => setView("landing")} />;
+    if (view === "auth" && !user) return <AuthScreen onBack={() => setView("landing")} initialMode={authMode} />;
     if (view === "paywall") return <PaywallScreen feature={paywallFeature} onBack={() => user ? setView("app") : setView("landing")} user={user} />;
     // CheckoutScreen handles its own auth wait (useAuth().loading) and
     // bounces to /auth?next=/checkout if unauthenticated, so it must render
@@ -211,7 +214,7 @@ export default function App() {
     // so the marketing surfaces aren't held back by the Supabase session check.
     if (loading || !minLoadDone) return <LoadingScreen />;
     if (user) return <TripApp user={user} profile={profile} isPro={isPro} onSignOut={handleSignOut} onInstall={() => setShowInstallModal(true)} isInstalled={isInstalled} canInstall={canInstall} isIOS={isIOS} isMobile={/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)} onPaywall={(feature) => { setPaywallFeature(feature); setView("paywall"); }} />;
-    return <LandingPage onGetStarted={handleStartFree} onLogin={() => setView("auth")} onGoPro={handleGoPro} />;
+    return <LandingPage onGetStarted={handleStartFree} onLogin={() => { setAuthMode("login"); setView("auth"); }} onRegister={() => { setAuthMode("signup"); setView("auth"); }} onGoPro={handleGoPro} />;
   };
 
   // Logout now lives inside TripApp's header control row (label · 🔄 · ⚙️ · Log out),
@@ -221,6 +224,7 @@ export default function App() {
     <>
       {renderView()}
       {showInstallModal && <InstallModal onClose={() => setShowInstallModal(false)} isIOS={isIOS} isAndroid={isAndroid} canInstall={canInstall} triggerInstall={triggerInstall} />}
+      <UpdateBanner />
     </>
   );
 }

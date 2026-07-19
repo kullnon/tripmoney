@@ -19,7 +19,7 @@ const T = {
   text: "#F0F4FF", textMid: "#8A9BC4", card: "#1A2235",
 };
 
-export default function SiteHeader({ scrollY = 0, onGetStarted }) {
+export default function SiteHeader({ scrollY = 0, onLogin, onRegister }) {
   const [logoOk, setLogoOk] = useState(true);
 
   return (
@@ -34,6 +34,17 @@ export default function SiteHeader({ scrollY = 0, onGetStarted }) {
         padding: "16px 0",
       }}
     >
+      {/* Two identical accent pills (Log in / Register) always visible. On small screens
+          the Guides/Pricing/Blog text links collapse so both pills fit without clipping. */}
+      <style>{`
+        .sh-pill{ display:inline-flex; align-items:center; justify-content:center; border:1px solid ${T.accent}; color:${T.accent}; background:${T.accent}14; border-radius:999px; padding:7px 16px; font-size:14px; font-weight:700; line-height:1; cursor:pointer; white-space:nowrap; font-family:inherit; }
+        .sh-pill:hover{ background:${T.accent}26; }
+        @media (max-width:640px){
+          .sh-navlink{ display:none !important; }
+          .sh-pill{ padding:6px 13px; font-size:13px; }
+          .sh-actions{ gap:8px !important; }
+        }
+      `}</style>
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
         {/* Brand: logo pinned LEFT of the wordmark, never shrinks, gap for breathing room */}
         <a
@@ -69,11 +80,14 @@ export default function SiteHeader({ scrollY = 0, onGetStarted }) {
           </span>
         </a>
 
-        <div className="nav-links" style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
-          <a href="/guides" className="nav-pricing" style={{ color: T.textMid, textDecoration: "none", fontSize: 14, fontWeight: 600 }}>Guides</a>
-          <a href="#pricing" className="nav-pricing" style={{ color: T.textMid, textDecoration: "none", fontSize: 14, fontWeight: 600 }}>Pricing</a>
-          <a href="https://blog.mytripmoney.com" className="nav-pricing" style={{ color: T.textMid, textDecoration: "none", fontSize: 14, fontWeight: 600 }}>Blog</a>
-          <button onClick={() => onGetStarted && onGetStarted()} style={{ background: T.accent, color: T.bg, border: "none", borderRadius: 10, padding: "10px 20px", fontSize: 14, fontWeight: 800, cursor: "pointer" }} className="cta-btn nav-cta">Get Started</button>
+        <div className="sh-actions" style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0, minWidth: 0 }}>
+          <a href="/guides" className="sh-navlink" style={{ color: T.textMid, textDecoration: "none", fontSize: 14, fontWeight: 600, whiteSpace: "nowrap" }}>Guides</a>
+          <a href="#pricing" className="sh-navlink" style={{ color: T.textMid, textDecoration: "none", fontSize: 14, fontWeight: 600, whiteSpace: "nowrap" }}>Pricing</a>
+          <a href="https://blog.mytripmoney.com" className="sh-navlink" style={{ color: T.textMid, textDecoration: "none", fontSize: 14, fontWeight: 600, whiteSpace: "nowrap" }}>Blog</a>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+            <button type="button" className="sh-pill" onClick={() => onLogin && onLogin()}>Log in</button>
+            <button type="button" className="sh-pill" onClick={() => onRegister && onRegister()}>Register</button>
+          </div>
         </div>
       </div>
     </nav>

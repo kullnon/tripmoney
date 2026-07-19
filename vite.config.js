@@ -6,7 +6,11 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt' so a new deploy surfaces the in-app "A new version is available"
+      // banner instead of silently auto-reloading. injectRegister:false → the ONLY
+      // SW registration is via useRegisterSW() in <UpdateBanner/> (no double-register).
+      registerType: 'prompt',
+      injectRegister: false,
       workbox: {
         // SSR'd routes must bypass the SPA-shell navigation fallback. Without
         // this denylist the SW intercepts top-level navigations to /trip/*,

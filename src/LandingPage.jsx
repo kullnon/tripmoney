@@ -45,7 +45,7 @@ const T = {
   text: "#F0F4FF", textMid: "#8A9BC4", textDim: "#4A5880",
 };
 
-export default function LandingPage({ onGetStarted, onLogin, onInstall, onGoPro, canInstall, isInstalled, isIOS, isAndroid, triggerInstall }) {
+export default function LandingPage({ onGetStarted, onLogin, onRegister, onInstall, onGoPro, canInstall, isInstalled, isIOS, isAndroid, triggerInstall }) {
   const [annual, setAnnual] = useState(true);
   const [scrollY, setScrollY] = useState(0);
   const [installing, setInstalling] = useState(false);
@@ -147,7 +147,7 @@ export default function LandingPage({ onGetStarted, onLogin, onInstall, onGoPro,
 `}</style>
 
       {/* ─── NAV ─── */}
-      <SiteHeader scrollY={scrollY} onGetStarted={onGetStarted} />
+      <SiteHeader scrollY={scrollY} onLogin={onLogin} onRegister={onRegister} />
 
       {/* ─── HERO (estimator) ─── */}
       <section style={{ minHeight: "100vh", display: "flex", alignItems: "center", position: "relative", overflow: "hidden", paddingTop: 100, paddingBottom: 60 }}>

@@ -28,8 +28,8 @@ function PasswordInput({ value, onChange, placeholder, onKeyDown }) {
   );
 }
 
-export function AuthScreen({ onBack }) {
-  const [mode, setMode] = useState("login");
+export function AuthScreen({ onBack, initialMode = "login" }) {
+  const [mode, setMode] = useState(initialMode === "signup" ? "signup" : "login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
