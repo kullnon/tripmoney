@@ -3,7 +3,8 @@
 // Reads today's editor_decisions row to choose what keyword to write — falls back
 // to lib/seo-keywords.js pickKeyword if no decision exists or GSC was unavailable.
 import { getServiceClient } from '../lib/supabase.js';
-import { pickKeyword } from '../lib/seo-keywords.js';
+import { pickKeyword, slugify } from '../lib/seo-keywords.js';
+import { planKeyword } from '../lib/keyword-planner.js';
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
 const CRON_SECRET = process.env.CRON_SECRET || '';
@@ -28,8 +29,9 @@ export default async function handler(req, res) {
   try {
     const supabase = getServiceClient();
 
-    const { data: existing } = await supabase.from('blog_posts').select('slug');
+    const { data: existing } = await supabase.from('blog_posts').select('slug, target_keyword');
     const existingSlugs = (existing || []).map((p) => p.slug);
+    const usedKeywords = (existing || []).map((p) => p.target_keyword).filter(Boolean);
 
     // ---------- Editor Agent integration ----------
     const today = new Date().toISOString().slice(0, 10);
@@ -61,13 +63,19 @@ export default async function handler(req, res) {
       }
       console.log(`[blog-generate] Using editor decision (${editorDecision.decision_type}): ${keyword}`);
     } else {
-      const kw = pickKeyword(existingSlugs);
+      let kw = pickKeyword(existingSlugs, usedKeywords);
+      decisionSource = 'bank';
       if (!kw) {
-        return res.status(400).json({ ok: false, error: 'All keywords used — add more to lib/seo-keywords.js' });
+        // Bank used up: ask the planner rather than stop publishing.
+        kw = await planKeyword({ apiKey: ANTHROPIC_API_KEY, usedKeywords, usedSlugs: existingSlugs, slugify });
+        decisionSource = 'planner';
+      }
+      if (!kw) {
+        return res.status(400).json({ ok: false, error: 'All keywords used and the planner proposed nothing new — add more to lib/seo-keywords.js' });
       }
       keyword = kw.keyword;
       category = kw.category;
-      console.log(`[blog-generate] Using keyword-bank fallback: ${keyword}`);
+      console.log(`[blog-generate] Using ${decisionSource} keyword: ${keyword}`);
     }
 
     // Mark decision consumed

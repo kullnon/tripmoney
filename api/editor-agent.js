@@ -94,7 +94,8 @@ function decide(gscRows, slugByKeyword, usedSlugs, gscError) {
   if (gscError || gscRows.length === 0) {
     return fallbackDecision(
       usedSlugs,
-      gscError ? `GSC unavailable: ${gscError}` : 'No GSC rows yet (site may be too new)'
+      gscError ? `GSC unavailable: ${gscError}` : 'No GSC rows yet (site may be too new)',
+      Array.from(slugByKeyword.keys())
     );
   }
 
@@ -158,11 +159,11 @@ function decide(gscRows, slugByKeyword, usedSlugs, gscError) {
   }
 
   // RULE 3 — fallback
-  return fallbackDecision(usedSlugs, 'No high-priority GSC signals — picking from keyword bank');
+  return fallbackDecision(usedSlugs, 'No high-priority GSC signals — picking from keyword bank', Array.from(slugByKeyword.keys()));
 }
 
-function fallbackDecision(usedSlugs, reason) {
-  const picked = pickKeyword(usedSlugs);
+function fallbackDecision(usedSlugs, reason, usedKeywords = []) {
+  const picked = pickKeyword(usedSlugs, usedKeywords);
   if (!picked) {
     return {
       decision_type: 'fallback',
