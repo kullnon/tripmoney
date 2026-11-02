@@ -1,3 +1,4 @@
+import { authHeaders } from './supabase';
 import { useState } from 'react';
 
 const T = {
@@ -32,7 +33,7 @@ export function PaywallScreen({ feature, onBack, user }) {
     try {
       const res = await fetch('/api/create-checkout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify({
           plan: billing,
           userId: user.id,

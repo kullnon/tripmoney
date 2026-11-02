@@ -1,6 +1,24 @@
 import Stripe from 'stripe';
+import { createClient } from '@supabase/supabase-js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+// The buyer is the logged-in Supabase user, read from the access token. Until
+// 2026-11-02 userId and email came from the request body with no login, so a
+// paid session could carry any userId and webhook.js would upgrade that profile.
+const supabase = createClient(
+  process.env.SUPABASE_URL || 'https://rthpayyevlloxsbzfxuf.supabase.co',
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
+
+async function sessionUser(req) {
+  const auth = req.headers.authorization || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+  if (!token) return null;
+  const { data, error } = await supabase.auth.getUser(token);
+  if (error || !data?.user?.id || !data.user.email) return null;
+  return data.user;
+}
 
 const PRICES = {
   monthly: 'price_1TQIvWJVPirYifUyW0euPVoZ',
@@ -13,13 +31,17 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { plan, userId, email } = req.body;
+    const user = await sessionUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Please log in to start checkout.' });
+    }
+    const userId = user.id;
+    const email = user.email;
 
+    // Any userId/email in the body is ignored.
+    const { plan } = req.body || {};
     if (!plan || !PRICES[plan]) {
       return res.status(400).json({ error: 'Invalid plan.' });
-    }
-    if (!userId || !email) {
-      return res.status(400).json({ error: 'Missing userId or email.' });
     }
 
     const origin = req.headers.origin || 'https://www.mytripmoney.com';

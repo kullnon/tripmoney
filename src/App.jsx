@@ -1,3 +1,4 @@
+import { authHeaders } from './supabase';
 import { useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
 import { trackPageview } from './lib/analytics';
@@ -174,7 +175,7 @@ export default function App() {
     try {
       const res = await fetch('/api/create-checkout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify({ plan: cycle, userId: user.id, email: user.email }),
       });
       const data = await res.json();

@@ -1,3 +1,4 @@
+import { authHeaders } from './supabase';
 import { useEffect, useState } from 'react';
 import { useAuth } from './AuthContext';
 
@@ -48,7 +49,7 @@ export default function CheckoutScreen() {
       try {
         res = await fetch('/api/create-checkout', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
           body: JSON.stringify({
             plan: pending.billing,
             userId: user.id,
