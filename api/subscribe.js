@@ -1,6 +1,7 @@
 // api/subscribe.js — Newsletter subscription + welcome email
 import { getServiceClient } from '../lib/supabase.js';
 import { sendWelcomeEmail } from '../lib/email.js';
+import { isSynthetic } from '../lib/synthetic.js';
 
 export default async function handler(req, res) {
   // CORS — allow the SPA to call this from the same domain or preview deploys
@@ -19,6 +20,21 @@ export default async function handler(req, res) {
     }
 
     const supabase = getServiceClient();
+
+    // Flow Watchdog probe (signed x-maestro-synthetic header, lib/synthetic.js): same
+    // validation as above, then prove the write (insert, read back, delete) with a unique
+    // reserved address and send NO welcome email.
+    if (isSynthetic(req.headers, 'mytripmoney')) {
+      const probe = `flow-watchdog+${Date.now()}@synthetic.invalid`;
+      const ins = await supabase.from('newsletter_subscribers').insert({ email: probe, source: 'flow_watchdog' }).select('id').maybeSingle();
+      if (ins.error || !ins.data) return res.status(503).json({ ok: false, synthetic: { write: 'failed', error: ins.error?.message || 'no row returned' } });
+      const back = await supabase.from('newsletter_subscribers').select('id').eq('id', ins.data.id).maybeSingle();
+      const del = await supabase.from('newsletter_subscribers').delete().eq('id', ins.data.id);
+      if (back.error || !back.data || del.error) {
+        return res.status(503).json({ ok: false, synthetic: { write: 'failed', error: back.error?.message || del.error?.message || 'read-back missing' } });
+      }
+      return res.status(200).json({ ok: true, synthetic: { write: 'verified' } });
+    }
 
     const { data: existing } = await supabase
       .from('newsletter_subscribers')

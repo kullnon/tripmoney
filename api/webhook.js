@@ -40,6 +40,11 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Webhook Error: ' + err.message });
   }
 
+  // Flow Watchdog synthetic sessions are expired unpaid; never act on one.
+  if (event.data && event.data.object && event.data.object.metadata && event.data.object.metadata.synthetic === '1') {
+    return res.status(200).json({ received: true, ignored: 'synthetic' });
+  }
+
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
     const userId = session.metadata && session.metadata.supabase_user_id;

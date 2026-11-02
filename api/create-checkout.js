@@ -1,5 +1,6 @@
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
+import { isSynthetic } from '../lib/synthetic.js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -46,17 +47,21 @@ export default async function handler(req, res) {
 
     const origin = req.headers.origin || 'https://www.mytripmoney.com';
 
+    // Flow Watchdog probe (signed header): tagged synthetic so webhook.js ignores it, and
+    // expiring in 31 minutes (Stripe's minimum is 30); the watchdog also expires it at once.
+    const synthetic = isSynthetic(req.headers, 'mytripmoney');
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       payment_method_types: ['card'],
       customer_email: email,
       line_items: [{ price: PRICES[plan], quantity: 1 }],
-      metadata: { supabase_user_id: userId },
+      metadata: synthetic ? { supabase_user_id: userId, synthetic: '1' } : { supabase_user_id: userId },
+      ...(synthetic ? { expires_at: Math.floor(Date.now() / 1000) + 31 * 60 } : {}),
       success_url: origin + '?checkout=success',
       cancel_url: origin + '?checkout=cancel',
     });
 
-    return res.status(200).json({ url: session.url });
+    return res.status(200).json(synthetic ? { url: session.url, sessionId: session.id } : { url: session.url });
   } catch (err) {
     console.error('Stripe checkout error:', {
       type: err.type,
