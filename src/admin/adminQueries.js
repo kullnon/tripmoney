@@ -1,5 +1,9 @@
 import { supabase } from '../supabase';
 
+// Flow Watchdog synthetic test accounts (flow-watchdog+<site>@maestromediax.com) are never
+// counted as signups, subscribers or traffic sources.
+const SYNTHETIC_EMAIL_PATTERN = 'flow-watchdog+%';
+
 // ─── Country display helpers ──────────────────────────────────────────────────
 // Flag: regional indicator symbols A=0x1F1E6, so offset by char code from 'A'
 export const codeToFlag = (code) => {
@@ -70,7 +74,7 @@ export async function getTopReferrers(dateRange, limit = 5) {
 export async function getKpis(dateRange) {
   const since = sinceDate(dateRange);
 
-  let signupsQ = supabase.from('profiles').select('*', { count: 'exact', head: true });
+  let signupsQ = supabase.from('profiles').select('*', { count: 'exact', head: true }).not('email', 'ilike', SYNTHETIC_EMAIL_PATTERN);
   if (since) signupsQ = signupsQ.gte('created_at', since);
   const { count: signups } = await signupsQ;
 
@@ -79,7 +83,7 @@ export async function getKpis(dateRange) {
   const { count: activeTrips } = await tripsQ;
 
   const { count: proSubscribers } = await supabase
-    .from('profiles').select('*', { count: 'exact', head: true }).eq('plan', 'pro');
+    .from('profiles').select('*', { count: 'exact', head: true }).not('email', 'ilike', SYNTHETIC_EMAIL_PATTERN).eq('plan', 'pro');
 
   const visitors = await getVisitorCount(dateRange);
 
