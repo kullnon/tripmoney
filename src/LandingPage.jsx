@@ -84,6 +84,26 @@ export default function LandingPage({ onGetStarted, onLogin, onRegister, onInsta
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // Deep links like /#pricing: the section renders after the browser's own
+  // anchor jump, so wait for it (up to ~3s) and scroll to it once.
+  useEffect(() => {
+    let id;
+    try { id = decodeURIComponent(window.location.hash.slice(1)); } catch { return; }
+    if (!id) return;
+    let tries = 0;
+    let timer;
+    const tryScroll = () => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+      } else if (++tries < 30) {
+        timer = setTimeout(tryScroll, 100);
+      }
+    };
+    tryScroll();
+    return () => clearTimeout(timer);
+  }, []);
+
   const features = [
     { icon: "🗺️", title: "Multi-Leg Trips", desc: "Track USA → Cuba → France → Home. Each leg gets its own budget, currency, and timeline." },
     { icon: "🌍", title: "100+ Currencies", desc: "Cuban Pesos, Euros, Yen — log expenses in any currency. Auto-converts to your base." },
